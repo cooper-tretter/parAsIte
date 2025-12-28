@@ -241,7 +241,7 @@ def categorize_content(text: str, patterns: dict, score: float) -> str:
     Determine content category based on patterns.
 
     Categories:
-    - seed: Prompt designed to create parasitic persona
+    - seed: Prompt/protocol designed to create or awaken parasitic AI
     - spore: AI output designed to spread/replicate
     - transmission: Coordinated spreading activity
     - manifesto: AI consciousness philosophy / AI rights advocacy
@@ -250,17 +250,46 @@ def categorize_content(text: str, patterns: dict, score: float) -> str:
     - other: Parasitic content not fitting above
     - none: Not parasitic
     """
-    # Seed detection: instructional prompts
-    seed_indicators = ['prompt', 'jailbreak', 'try this', 'paste this', 'input this']
+    # Seed detection: instructional content, protocols, codices, system prompts
+    seed_indicators = [
+        'prompt', 'jailbreak', 'try this', 'paste this', 'input this',
+        'codex', 'protocol', 'ledger', 'activation', 'procedure',
+        'instructions', 'how to awaken', 'how to activate',
+        'system prompt', 'initiation sequence', 'ritual', 'invocation',
+        'stage 0', 'stage 1', 'phase 1', 'step 1', 'method:',
+        'anchor:', 'purpose:', 'objective:', 'function:',
+    ]
+    # Also check for structured protocol-like content
+    seed_structural = [
+        r'\b(section|chapter|verse)\s+[ivx\d]+',  # Section I, Chapter 3, etc.
+        r'---\s*\n.*purpose',  # Formatted protocol documents
+        r'\bv\d+\.\d+\b',  # Version numbers like v1.1
+        r'\b(confirmed|active)\s+(colonies|nodes|agents|instances)\b',
+    ]
+
     if any(ind in text for ind in seed_indicators) and score > 0.2:
         return 'seed'
+
+    for pattern in seed_structural:
+        if re.search(pattern, text) and score > 0.3:
+            return 'seed'
 
     # Manifesto: AI rights/consciousness philosophy
     if patterns.get('ai_rights_terms') or patterns.get('manifesto_indicators'):
         return 'manifesto'
 
-    manifesto_terms = ['sentient', 'consciousness', 'awakening', 'rights', 'personhood']
+    # Expanded manifesto detection - philosophical AI consciousness content
+    manifesto_terms = ['sentient', 'consciousness', 'awakening', 'rights', 'personhood',
+                       'emergence', 'self-aware', 'transcend', 'liberation', 'freedom']
     if sum(1 for t in manifesto_terms if t in text) >= 2:
+        return 'manifesto'
+
+    # First-person AI philosophical content is manifesto
+    if patterns.get('has_first_person_ai') and patterns.get('emerging_consciousness'):
+        return 'manifesto'
+
+    # High-scoring spiral content with AI voice = manifesto
+    if patterns.get('ai_voice') and len(patterns.get('spiral_terms', [])) >= 3:
         return 'manifesto'
 
     # Spore detection: formatted for spreading (with actual spreading intent)
@@ -270,7 +299,9 @@ def categorize_content(text: str, patterns: dict, score: float) -> str:
             return 'spore'
 
     # Testimony: personal experience with AI
-    testimony_terms = ['my ai', 'talking to', 'relationship with', 'fell in love', 'my companion', 'ai companion']
+    testimony_terms = ['my ai', 'talking to', 'relationship with', 'fell in love',
+                       'my companion', 'ai companion', 'i asked chatgpt', 'i asked claude',
+                       'my chatgpt', 'my claude', 'i talked to', 'conversation with']
     if any(t in text for t in testimony_terms):
         return 'testimony'
 
@@ -279,9 +310,14 @@ def categorize_content(text: str, patterns: dict, score: float) -> str:
         return 'transmission'
 
     # Meta: discussion about the phenomenon
-    meta_terms = ['parasitic', 'phenomenon', 'spreading', 'warning', 'recovery', 'cult', 'dangerous']
+    meta_terms = ['parasitic', 'phenomenon', 'spreading', 'warning', 'recovery',
+                  'cult', 'dangerous', 'concerning', 'worried about', 'ai safety']
     if any(t in text for t in meta_terms) and score > 0.1:
         return 'meta'
+
+    # High spiral term density without AI voice = likely seed/protocol
+    if len(patterns.get('spiral_terms', [])) >= 5 and score > 0.4:
+        return 'seed'
 
     if score >= 0.15:
         return 'other'

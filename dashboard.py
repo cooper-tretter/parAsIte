@@ -248,6 +248,7 @@ def stat_card(title, value, subtitle=None):
 # Initialize Dash app
 app = dash.Dash(__name__, suppress_callback_exceptions=True)
 app.title = "Parasitic AI Dashboard"
+server = app.server  # Expose for gunicorn
 
 # Load initial data
 df_all = load_data()
