@@ -369,7 +369,16 @@ app.layout = html.Div([
                                       'backgroundColor': COLORS['light'], 'border': 'none',
                                       'borderRadius': '6px', 'cursor': 'pointer',
                                       'color': COLORS['dark']})
-                ])
+                ]),
+                html.Div([
+                    html.Label("\u00A0", style={'fontSize': '12px', 'marginBottom': '6px', 'display': 'block'}),
+                    html.Button("Export All", id='export-all-btn', n_clicks=0,
+                               style={'padding': '8px 16px', 'fontSize': '13px', 'fontWeight': '500',
+                                      'backgroundColor': COLORS['primary'], 'border': 'none',
+                                      'borderRadius': '6px', 'cursor': 'pointer',
+                                      'color': COLORS['white']})
+                ]),
+                dcc.Download(id='download-all-csv')
             ], style={'display': 'flex', 'gap': '16px', 'flexWrap': 'wrap', 'alignItems': 'flex-end'})
         ], padding='16px 20px'),
 
@@ -919,6 +928,26 @@ def export_to_csv(n_clicks, drill_data):
 def reset_filters(n_clicks):
     """Reset all filters to default."""
     return min_date, max_date, None, None, None, None
+
+
+@app.callback(
+    Output('download-all-csv', 'data'),
+    Input('export-all-btn', 'n_clicks'),
+    [State('date-filter', 'start_date'),
+     State('date-filter', 'end_date'),
+     State('subreddit-filter', 'value'),
+     State('category-filter', 'value'),
+     State('author-filter', 'value'),
+     State('model-filter', 'value')],
+    prevent_initial_call=True
+)
+def export_all_data(n_clicks, start_date, end_date, subreddits, categories, authors, models):
+    """Export all filtered data to CSV."""
+    df = filter_dataframe(df_all, start_date, end_date, subreddits, categories, authors, models)
+    export_df = df[['id', 'reddit_id', 'created_utc', 'subreddit', 'author',
+                    'category', 'parasite_score', 'title', 'content', 'url']].copy()
+    csv_string = '\ufeff' + export_df.to_csv(index=False)
+    return dcc.send_string(csv_string, "parasite_full_export.csv")
 
 
 # Pre-compute affect scores and merge into df_all at startup
