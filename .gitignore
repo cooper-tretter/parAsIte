@@ -1,0 +1,38 @@
+# Environment and secrets
+.env
+*.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Claude Code
+.claude/
+
+# Data exports (may contain sensitive content)
+*.csv
+parasitic_data_export*.csv
+
+# Logs
+*.log
+
+# Database dumps
+*.sql.backup
+*.dump
