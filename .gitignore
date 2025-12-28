@@ -36,3 +36,5 @@ parasitic_data_export*.csv
 # Database dumps
 *.sql.backup
 *.dump
+*_backup.sql
+parasite_backup.sql
