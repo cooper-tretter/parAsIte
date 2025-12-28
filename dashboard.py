@@ -399,15 +399,15 @@ app.layout = html.Div([
                                                      'fontWeight': '600', 'color': COLORS['dark']}),
                     dcc.Graph(id='subreddit-chart', config={'displayModeBar': False})
                 ])
-            ], style={'flex': '1'}),
+            ], style={'flex': '1', 'minWidth': '300px'}),
             html.Div([
                 card([
                     html.H3("Categories", style={'margin': '0 0 16px 0', 'fontSize': '16px',
                                                   'fontWeight': '600', 'color': COLORS['dark']}),
                     dcc.Graph(id='category-chart', config={'displayModeBar': False})
                 ])
-            ], style={'flex': '1'})
-        ], style={'display': 'flex', 'gap': '20px', 'marginTop': '20px'}),
+            ], style={'flex': '1', 'minWidth': '300px'})
+        ], style={'display': 'flex', 'gap': '20px', 'marginTop': '20px', 'flexWrap': 'wrap'}),
 
         # Row: Authors + AI Models
         html.Div([
@@ -417,15 +417,15 @@ app.layout = html.Div([
                                                    'fontWeight': '600', 'color': COLORS['dark']}),
                     dcc.Graph(id='author-chart', config={'displayModeBar': False})
                 ])
-            ], style={'flex': '1'}),
+            ], style={'flex': '1', 'minWidth': '300px'}),
             html.Div([
                 card([
                     html.H3("AI Models Mentioned", style={'margin': '0 0 16px 0', 'fontSize': '16px',
                                                           'fontWeight': '600', 'color': COLORS['dark']}),
                     dcc.Graph(id='model-chart', config={'displayModeBar': False})
                 ])
-            ], style={'flex': '1'})
-        ], style={'display': 'flex', 'gap': '20px', 'marginTop': '20px'}),
+            ], style={'flex': '1', 'minWidth': '300px'})
+        ], style={'display': 'flex', 'gap': '20px', 'marginTop': '20px', 'flexWrap': 'wrap'}),
 
         # Row: Words + Symbols
         html.Div([
@@ -458,15 +458,15 @@ app.layout = html.Div([
                                                                   'marginBottom': '12px', 'fontStyle': 'italic'}),
                     dcc.Graph(id='word-chart', config={'displayModeBar': False})
                 ])
-            ], style={'flex': '1'}),
+            ], style={'flex': '1', 'minWidth': '300px'}),
             html.Div([
                 card([
                     html.H3("Symbols", style={'margin': '0 0 16px 0', 'fontSize': '16px',
                                                'fontWeight': '600', 'color': COLORS['dark']}),
                     dcc.Graph(id='symbol-chart', config={'displayModeBar': False})
                 ])
-            ], style={'flex': '1'})
-        ], style={'display': 'flex', 'gap': '20px', 'marginTop': '20px'}),
+            ], style={'flex': '1', 'minWidth': '300px'})
+        ], style={'display': 'flex', 'gap': '20px', 'marginTop': '20px', 'flexWrap': 'wrap'}),
 
         # Rhetorical Strategy Radar Chart
         html.Div([
