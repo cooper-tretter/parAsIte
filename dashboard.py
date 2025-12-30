@@ -729,6 +729,47 @@ app.layout = html.Div([
 
     ], style={'padding': '20px 32px', 'maxWidth': '1400px', 'margin': '0 auto'}),
 
+    # Aggregate Correlation Analysis Section
+    html.Div([
+        html.H2("Risk Factor Correlation Analysis",
+               style={'fontSize': '18px', 'fontWeight': '600', 'color': COLORS['dark'],
+                      'marginBottom': '8px'}),
+        html.P("Comparing pre-parasitic risk indicators across all tracked users",
+              style={'fontSize': '12px', 'color': COLORS['muted'], 'marginBottom': '16px'}),
+
+        html.Div([
+            # Correlation chart
+            html.Div([
+                dcc.Graph(id='aggregate-correlation-chart', config={'displayModeBar': False})
+            ], style={
+                'backgroundColor': COLORS['white'],
+                'borderRadius': '12px',
+                'padding': '20px',
+                'boxShadow': '0 1px 3px rgba(0,0,0,0.1)',
+                'border': f'1px solid {COLORS["border"]}',
+                'flex': '2',
+                'minWidth': '500px'
+            }),
+
+            # Summary stats
+            html.Div([
+                html.Div(id='correlation-summary', style={'padding': '12px'})
+            ], style={
+                'backgroundColor': COLORS['white'],
+                'borderRadius': '12px',
+                'padding': '20px',
+                'boxShadow': '0 1px 3px rgba(0,0,0,0.1)',
+                'border': f'1px solid {COLORS["border"]}',
+                'flex': '1',
+                'minWidth': '300px'
+            })
+        ], style={'display': 'flex', 'gap': '20px', 'flexWrap': 'wrap'}),
+
+        # Interval to trigger load
+        dcc.Interval(id='correlation-interval', interval=60000, n_intervals=0, max_intervals=1)
+
+    ], style={'padding': '20px 32px', 'maxWidth': '1400px', 'margin': '0 auto'}),
+
     # Drill-down Modal
     html.Div([
         html.Div([
@@ -1820,6 +1861,220 @@ def display_user_timeline(username):
               'marginBottom': '12px'})
 
     return html.Div([summary] + sections)
+
+
+def compute_aggregate_correlation():
+    """
+    Compute aggregate correlation between pre-parasitic risk factors and parasitic behavior.
+    Returns data for visualization.
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Get all users with history data
+        cursor.execute("""
+            SELECT DISTINCT username FROM user_histories
+        """)
+        users = [row[0] for row in cursor.fetchall()]
+
+        if not users:
+            conn.close()
+            return None, None
+
+        user_stats = []
+
+        for username in users:
+            # Get pre-parasitic posts
+            cursor.execute("""
+                SELECT title, content, is_parasitic
+                FROM user_histories
+                WHERE username = %s AND is_pre_parasitic = true
+            """, (username,))
+            pre_posts = cursor.fetchall()
+
+            # Get post-parasitic posts
+            cursor.execute("""
+                SELECT COUNT(*), SUM(CASE WHEN is_parasitic THEN 1 ELSE 0 END)
+                FROM user_histories
+                WHERE username = %s AND is_pre_parasitic = false
+            """, (username,))
+            post_stats = cursor.fetchone()
+
+            # Count risk indicators in pre-parasitic posts
+            indicator_counts = {k: 0 for k in PRE_PARASITIC_INDICATORS.keys()}
+            total_pre = 0
+
+            for title, content, is_parasitic in pre_posts:
+                combined = (content or '') + ' ' + (title or '')
+                if combined.strip():
+                    total_pre += 1
+                    tags = tag_pre_parasitic_content(combined)
+                    for tag_name, count in tags.items():
+                        indicator_counts[tag_name] += count
+
+            # Calculate post-parasitic rate
+            post_total = post_stats[0] or 0
+            post_parasitic = post_stats[1] or 0
+            parasitic_rate = post_parasitic / post_total if post_total > 0 else 0
+
+            user_stats.append({
+                'username': username,
+                'pre_posts': total_pre,
+                'post_total': post_total,
+                'post_parasitic': post_parasitic,
+                'parasitic_rate': parasitic_rate,
+                'indicators': indicator_counts,
+                'total_indicators': sum(indicator_counts.values())
+            })
+
+        conn.close()
+
+        # Aggregate indicator correlations
+        indicator_correlations = {}
+        for indicator_name in PRE_PARASITIC_INDICATORS.keys():
+            users_with = [u for u in user_stats if u['indicators'][indicator_name] > 0]
+            users_without = [u for u in user_stats if u['indicators'][indicator_name] == 0]
+
+            avg_rate_with = sum(u['parasitic_rate'] for u in users_with) / len(users_with) if users_with else 0
+            avg_rate_without = sum(u['parasitic_rate'] for u in users_without) / len(users_without) if users_without else 0
+
+            indicator_correlations[indicator_name] = {
+                'users_with': len(users_with),
+                'users_without': len(users_without),
+                'avg_rate_with': avg_rate_with,
+                'avg_rate_without': avg_rate_without,
+                'lift': (avg_rate_with / avg_rate_without) if avg_rate_without > 0 else 0,
+                'total_matches': sum(u['indicators'][indicator_name] for u in user_stats)
+            }
+
+        return user_stats, indicator_correlations
+
+    except Exception as e:
+        print(f"Error computing correlation: {e}")
+        import traceback
+        traceback.print_exc()
+        return None, None
+
+
+@app.callback(
+    [Output('aggregate-correlation-chart', 'figure'),
+     Output('correlation-summary', 'children')],
+    Input('correlation-interval', 'n_intervals')
+)
+def update_correlation_analysis(_):
+    """Update the aggregate correlation chart and summary."""
+    user_stats, indicator_correlations = compute_aggregate_correlation()
+
+    if not user_stats or not indicator_correlations:
+        empty_fig = go.Figure()
+        empty_fig.add_annotation(text="Insufficient data for correlation analysis",
+                                xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
+        empty_fig.update_layout(height=350, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+        return empty_fig, html.P("No user history data available. Run user_history.py to collect data.",
+                                style={'color': COLORS['muted']})
+
+    # Build grouped bar chart comparing parasitic rates
+    indicators = []
+    rates_with = []
+    rates_without = []
+    colors = []
+    lifts = []
+
+    for indicator_name, data in indicator_correlations.items():
+        indicator = PRE_PARASITIC_INDICATORS.get(indicator_name, {})
+        if data['users_with'] > 0:  # Only show indicators with data
+            indicators.append(indicator.get('label', indicator_name))
+            rates_with.append(data['avg_rate_with'] * 100)
+            rates_without.append(data['avg_rate_without'] * 100)
+            colors.append(indicator.get('color', '#6b7280'))
+            lifts.append(data['lift'])
+
+    # Sort by lift (correlation strength)
+    sorted_data = sorted(zip(indicators, rates_with, rates_without, colors, lifts),
+                        key=lambda x: x[4], reverse=True)
+
+    if sorted_data:
+        indicators, rates_with, rates_without, colors, lifts = zip(*sorted_data)
+    else:
+        indicators, rates_with, rates_without, colors, lifts = [], [], [], [], []
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Bar(
+        name='With Risk Factor',
+        x=list(indicators),
+        y=list(rates_with),
+        marker_color=list(colors),
+        text=[f'{r:.1f}%' for r in rates_with],
+        textposition='outside'
+    ))
+
+    fig.add_trace(go.Bar(
+        name='Without Risk Factor',
+        x=list(indicators),
+        y=list(rates_without),
+        marker_color=['rgba(107, 114, 128, 0.4)'] * len(indicators),
+        text=[f'{r:.1f}%' for r in rates_without],
+        textposition='outside'
+    ))
+
+    fig.update_layout(
+        title='Post-Parasitic Rate by Pre-Parasitic Risk Factor',
+        barmode='group',
+        height=350,
+        margin=dict(l=20, r=20, t=50, b=80),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        yaxis=dict(showgrid=True, gridcolor=COLORS['border'], title='% Parasitic Posts After'),
+        xaxis=dict(tickangle=-45),
+        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
+    )
+
+    # Build summary
+    total_users = len(user_stats)
+    users_with_indicators = len([u for u in user_stats if u['total_indicators'] > 0])
+    avg_parasitic_with = sum(u['parasitic_rate'] for u in user_stats if u['total_indicators'] > 0) / users_with_indicators if users_with_indicators > 0 else 0
+    avg_parasitic_without = sum(u['parasitic_rate'] for u in user_stats if u['total_indicators'] == 0) / (total_users - users_with_indicators) if (total_users - users_with_indicators) > 0 else 0
+
+    # Find strongest correlations
+    strongest = sorted([(k, v['lift']) for k, v in indicator_correlations.items() if v['lift'] > 0],
+                      key=lambda x: x[1], reverse=True)[:3]
+
+    summary_items = [
+        html.H4("Summary", style={'fontSize': '14px', 'fontWeight': '600', 'margin': '0 0 12px 0'}),
+        html.P(f"Users analyzed: {total_users}", style={'fontSize': '12px', 'margin': '4px 0'}),
+        html.P(f"Users with risk factors: {users_with_indicators} ({users_with_indicators/total_users*100:.0f}%)",
+              style={'fontSize': '12px', 'margin': '4px 0'}),
+        html.Hr(style={'margin': '12px 0', 'border': 'none', 'borderTop': f'1px solid {COLORS["border"]}'}),
+        html.P([
+            html.Strong("Avg parasitic rate WITH indicators: "),
+            f"{avg_parasitic_with*100:.1f}%"
+        ], style={'fontSize': '12px', 'margin': '4px 0'}),
+        html.P([
+            html.Strong("Avg parasitic rate WITHOUT: "),
+            f"{avg_parasitic_without*100:.1f}%"
+        ], style={'fontSize': '12px', 'margin': '4px 0'}),
+    ]
+
+    if strongest:
+        summary_items.append(html.Hr(style={'margin': '12px 0', 'border': 'none',
+                                            'borderTop': f'1px solid {COLORS["border"]}'}))
+        summary_items.append(html.P("Strongest correlations:",
+                                   style={'fontSize': '12px', 'fontWeight': '600', 'margin': '4px 0'}))
+        for ind_name, lift in strongest:
+            indicator = PRE_PARASITIC_INDICATORS.get(ind_name, {})
+            summary_items.append(html.P([
+                html.Span("● ", style={'color': indicator.get('color', '#6b7280')}),
+                f"{indicator.get('label', ind_name)}: {lift:.1f}x lift"
+            ], style={'fontSize': '11px', 'margin': '2px 0 2px 8px'}))
+
+    summary_items.append(html.Hr(style={'margin': '12px 0', 'border': 'none',
+                                        'borderTop': f'1px solid {COLORS["border"]}'}))
+    summary_items.append(html.P("Note: 'Lift' measures how much more likely users with a risk factor are to post parasitic content.",
+                               style={'fontSize': '10px', 'color': COLORS['muted'], 'fontStyle': 'italic'}))
+
+    return fig, html.Div(summary_items)
 
 
 if __name__ == '__main__':
