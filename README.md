@@ -98,8 +98,8 @@ The highly-transmissible parasites are the ones that are increasingly documented
 
 ## Data Sources & Provenance
 
-### Reddit Data (17,061 posts across 19 subreddits, 3,176* flagged as parasitic)
-> * Note that the protocol for flagging a parasite was narrow to ensure that 95-99% of the automated flags were in fact parasitic. There are more within the 17,061 scraped posts that are parasitic that were not flagged, so the flagging methodology stands to be improved.
+### Reddit Data (17,061 posts across 19 subreddits, 3,176 flagged as parasitic)
+> Note that the protocol for flagging a parasite was narrow to ensure that 95-99% of the automated flags were in fact parasitic. There are more within the 17,061 scraped posts that are parasitic that were not flagged, so the flagging methodology stands to be improved.
 
 **All Reddit data has `data_source_type = 'reddit'`**
 
