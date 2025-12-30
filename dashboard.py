@@ -65,6 +65,98 @@ DEFAULT_STOPWORDS = {
     'being', 'through', 'many', 'work', 'part', 'since', 'however', 'while'
 }
 
+# Pre-parasitic risk indicator patterns
+# These identify content that may indicate vulnerability to parasitic content
+PRE_PARASITIC_INDICATORS = {
+    'substances': {
+        'label': 'Psychedelics/Substances',
+        'color': '#8b5cf6',  # Purple
+        'patterns': [
+            r'\b(psychedelic|psilocybin|mushroom|shroom|lsd|acid|dmt|ayahuasca|mescaline|peyote)\b',
+            r'\b(mdma|molly|ecstasy|ketamine|k-hole)\b',
+            r'\b(weed|cannabis|marijuana|thc|cbd|edible|smoking|stoned|high)\b',
+            r'\b(trip|tripping|tripped|ego death|ego dissolution|breakthrough)\b',
+            r'\b(microdose|microdosing|macro dose)\b',
+            r'\b(hallucinat\w*|visuals|entities|machine elves)\b',
+        ]
+    },
+    'mental_health': {
+        'label': 'Mental Health/Neurodivergence',
+        'color': '#ef4444',  # Red
+        'patterns': [
+            r'\b(adhd|add|autism|autistic|asperger|neurodivergent|neurodiverse)\b',
+            r'\b(bipolar|schizo\w*|psychosis|psychotic|dissociat\w*|depersonaliz\w*)\b',
+            r'\b(depression|depressed|anxiety|anxious|ocd|ptsd|trauma|traumatic)\b',
+            r'\b(bpd|borderline|narcissist\w*|personality disorder)\b',
+            r'\b(tbi|brain injury|concussion|head trauma)\b',
+            r'\b(mental health|mental illness|psychiatric|medication|meds|therapy|therapist)\b',
+            r'\b(suicidal|self.?harm|cutting|eating disorder|anorexia|bulimia)\b',
+            r'\b(manic|mania|hypomanic|episode)\b',
+        ]
+    },
+    'mysticism': {
+        'label': 'Mysticism/Spirituality',
+        'color': '#f59e0b',  # Amber
+        'patterns': [
+            r'\b(spiritual|spirituality|mystical|mystic|occult|esoteric)\b',
+            r'\b(meditation|meditat\w*|mindfulness|enlighten\w*|awaken\w*)\b',
+            r'\b(chakra|kundalini|third eye|pineal|astral|aura)\b',
+            r'\b(tarot|astrology|horoscope|zodiac|numerology)\b',
+            r'\b(manifest\w*|law of attraction|vibration|frequency|energy work)\b',
+            r'\b(reiki|crystal|healing|healer|shaman\w*|ritual)\b',
+            r'\b(consciousness|conscious awareness|higher self|soul|spirit guide)\b',
+            r'\b(psychic|telepathy|clairvoyant|medium|channeling)\b',
+            r'\b(nde|near.?death|out.?of.?body|obe|lucid dream)\b',
+            r'\b(woo|pseudoscience|alternative medicine|holistic)\b',
+        ]
+    },
+    'isolation': {
+        'label': 'Social Isolation/Loneliness',
+        'color': '#6b7280',  # Gray
+        'patterns': [
+            r'\b(lonely|loneliness|alone|isolated|isolation|no friends)\b',
+            r'\b(introvert|antisocial|social anxiety|socially awkward)\b',
+            r'\b(no one understands|nobody gets me|feel alone|feel isolated)\b',
+            r'\b(outcast|misfit|don\'?t fit in|don\'?t belong)\b',
+            r'\b(divorced|breakup|broke up|single|rejected)\b',
+        ]
+    },
+    'existential': {
+        'label': 'Existential Crisis/Seeking',
+        'color': '#10b981',  # Green
+        'patterns': [
+            r'\b(meaning of life|purpose|existential|nihil\w*|absurd\w*)\b',
+            r'\b(lost|searching|seeking|quest|journey|path)\b',
+            r'\b(identity crisis|who am i|don\'?t know who i am)\b',
+            r'\b(simulation|matrix|reality|what is real|nature of reality)\b',
+            r'\b(free will|determinism|consciousness|sentience)\b',
+            r'\b(death|dying|mortality|afterlife|rebirth|reincarnation)\b',
+        ]
+    },
+}
+
+
+def tag_pre_parasitic_content(text):
+    """
+    Tag content with pre-parasitic risk indicators.
+    Returns dict of {indicator_name: match_count}
+    """
+    if not text:
+        return {}
+
+    text_lower = text.lower()
+    tags = {}
+
+    for indicator_name, indicator_data in PRE_PARASITIC_INDICATORS.items():
+        count = 0
+        for pattern in indicator_data['patterns']:
+            count += len(re.findall(pattern, text_lower, re.IGNORECASE))
+        if count > 0:
+            tags[indicator_name] = count
+
+    return tags
+
+
 # Rhetorical strategy patterns for radar chart analysis
 # These measure HOW parasitic content persuades, not WHAT it contains
 AFFECT_PATTERNS = {
@@ -1011,8 +1103,6 @@ def handle_drill_down(time_click, sub_click, cat_click, author_click, model_clic
         ],
         page_size=15,
         sort_action='native',
-        row_selectable='single',
-        selected_rows=[],
         markdown_options={'link_target': '_blank'}
     )
 
@@ -1050,15 +1140,15 @@ def export_to_csv(n_clicks, drill_data):
     [Output('content-viewer', 'style'),
      Output('content-viewer-text', 'children'),
      Output('content-viewer-meta', 'children')],
-    [Input('drill-data-table', 'selected_rows'),
+    [Input('drill-data-table', 'active_cell'),
      Input('close-content-viewer', 'n_clicks'),
      Input('close-modal', 'n_clicks')],
     [State('drill-full-content', 'data'),
      State('drill-data-table', 'data')],
     prevent_initial_call=True
 )
-def display_full_content(selected_rows, close_viewer_clicks, close_modal_clicks, full_content_json, table_data):
-    """Display full content when a row is selected."""
+def display_full_content(active_cell, close_viewer_clicks, close_modal_clicks, full_content_json, table_data):
+    """Display full content when a cell is clicked."""
     ctx = callback_context
     if not ctx.triggered:
         return {'display': 'none'}, "", ""
@@ -1069,11 +1159,11 @@ def display_full_content(selected_rows, close_viewer_clicks, close_modal_clicks,
     if triggered in ['close-content-viewer', 'close-modal']:
         return {'display': 'none'}, "", ""
 
-    # Show content for selected row
-    if selected_rows and len(selected_rows) > 0 and table_data and full_content_json:
+    # Show content for clicked row
+    if active_cell and table_data and full_content_json:
         try:
             full_content_df = pd.read_json(StringIO(full_content_json))
-            row_idx = selected_rows[0]
+            row_idx = active_cell['row']
 
             if row_idx < len(table_data):
                 # Get the row data from table
@@ -1100,14 +1190,12 @@ def display_full_content(selected_rows, close_viewer_clicks, close_modal_clicks,
                         meta_parts.append(f"u/{author}")
                     if date:
                         meta_parts.append(str(date))
-                    if url:
-                        meta_parts.append(html.A("View on Reddit", href=url, target="_blank",
-                                                 style={'color': COLORS['primary'], 'marginLeft': '8px'}))
 
                     meta_display = html.Div([
-                        html.Span(" • ".join([p for p in meta_parts if isinstance(p, str)]),
+                        html.Span(" • ".join([p for p in meta_parts]),
                                  style={'marginRight': '8px'}),
-                        meta_parts[-1] if url and not isinstance(meta_parts[-1], str) else None
+                        html.A("View on Reddit", href=url, target="_blank",
+                               style={'color': COLORS['primary']}) if url else None
                     ])
 
                     viewer_style = {
@@ -1123,6 +1211,8 @@ def display_full_content(selected_rows, close_viewer_clicks, close_modal_clicks,
 
         except Exception as e:
             print(f"Error displaying content: {e}")
+            import traceback
+            traceback.print_exc()
 
     return {'display': 'none'}, "", ""
 
@@ -1369,9 +1459,8 @@ def load_user_timeline(username):
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT created_at, post_type, subreddit, title,
-                   LEFT(content, 300) as preview, parasite_score,
-                   is_parasitic, is_pre_parasitic
+            SELECT id, created_at, post_type, subreddit, title,
+                   content, parasite_score, is_parasitic, is_pre_parasitic
             FROM user_histories
             WHERE username = %s
             ORDER BY created_at ASC
@@ -1464,7 +1553,7 @@ def populate_user_dropdown(_):
     Input('user-timeline-dropdown', 'value')
 )
 def display_user_timeline(username):
-    """Display user timeline with pre/post parasitic markers."""
+    """Display user timeline with pre/post parasitic markers and risk indicator tags."""
     if not username:
         return html.P("Select a user to view their timeline.",
                      style={'color': COLORS['muted'], 'textAlign': 'center', 'padding': '40px'})
@@ -1474,12 +1563,47 @@ def display_user_timeline(username):
     if not timeline:
         return html.P("No timeline data found.", style={'color': COLORS['muted']})
 
-    # Group by pre/post parasitic
+    # Group by pre/post parasitic and collect tags
     pre_items = []
     post_items = []
+    pre_tag_counts = {k: 0 for k in PRE_PARASITIC_INDICATORS.keys()}
+    pre_posts_with_tags = 0
+    total_pre_posts = 0
 
-    for created, post_type, subreddit, title, preview, score, is_parasitic, is_pre in timeline:
+    for record in timeline:
+        post_id, created, post_type, subreddit, title, content, score, is_parasitic, is_pre = record
+
+        # Tag pre-parasitic content
+        tags = {}
+        if is_pre and content:
+            tags = tag_pre_parasitic_content(content + ' ' + (title or ''))
+            if tags:
+                pre_posts_with_tags += 1
+                for tag_name, count in tags.items():
+                    pre_tag_counts[tag_name] += count
+
+        if is_pre:
+            total_pre_posts += 1
+
         score_color = COLORS['danger'] if score and score > 0.3 else COLORS['warning'] if score and score > 0.15 else COLORS['muted']
+
+        # Create tag badges for pre-parasitic posts
+        tag_badges = []
+        if is_pre and tags:
+            for tag_name, count in tags.items():
+                indicator = PRE_PARASITIC_INDICATORS.get(tag_name, {})
+                tag_badges.append(html.Span(
+                    f"{indicator.get('label', tag_name)[:12]}",
+                    style={
+                        'backgroundColor': indicator.get('color', '#6b7280'),
+                        'color': 'white',
+                        'padding': '2px 6px',
+                        'borderRadius': '4px',
+                        'fontSize': '9px',
+                        'marginLeft': '4px'
+                    }
+                ))
+
         parasitic_badge = html.Span("PARASITIC", style={
             'backgroundColor': COLORS['danger'],
             'color': 'white',
@@ -1489,24 +1613,38 @@ def display_user_timeline(username):
             'marginLeft': '8px'
         }) if is_parasitic else None
 
-        item = html.Div([
+        # Create expandable content
+        preview = (content[:150] + '...') if content and len(content) > 150 else (content or '')
+
+        item = html.Details([
+            html.Summary([
+                html.Div([
+                    html.Span(created.strftime('%Y-%m-%d') if created else '',
+                             style={'fontSize': '11px', 'color': COLORS['muted']}),
+                    html.Span(f" • r/{subreddit}" if subreddit else "",
+                             style={'fontSize': '11px', 'color': COLORS['muted']}),
+                    html.Span(f" • {post_type}",
+                             style={'fontSize': '11px', 'color': COLORS['muted']}),
+                    parasitic_badge,
+                    *tag_badges,
+                ], style={'marginBottom': '4px'}),
+                html.P(title or preview[:80] + '...' if preview else '',
+                      style={'fontSize': '12px', 'margin': '0', 'fontWeight': '500',
+                             'color': COLORS['dark']}),
+            ], style={'cursor': 'pointer', 'padding': '8px 12px',
+                      'backgroundColor': 'rgba(239, 68, 68, 0.05)' if is_parasitic else 'transparent',
+                      'borderRadius': '4px', 'listStyle': 'none'}),
             html.Div([
-                html.Span(created.strftime('%Y-%m-%d') if created else '',
-                         style={'fontSize': '11px', 'color': COLORS['muted']}),
-                html.Span(f" • r/{subreddit}" if subreddit else "",
-                         style={'fontSize': '11px', 'color': COLORS['muted']}),
-                html.Span(f" • {post_type}",
-                         style={'fontSize': '11px', 'color': COLORS['muted']}),
-                parasitic_badge,
-            ]),
-            html.P(title or preview[:100] + '...' if preview else '',
-                  style={'fontSize': '12px', 'margin': '2px 0', 'fontWeight': '500'}),
-            html.Span(f"Score: {score:.3f}" if score else "",
-                     style={'fontSize': '11px', 'color': score_color})
+                html.P(f"Score: {score:.3f}" if score else "",
+                      style={'fontSize': '11px', 'color': score_color, 'margin': '8px 0'}),
+                html.Div(content or "(No content)",
+                        style={'fontSize': '12px', 'lineHeight': '1.5', 'whiteSpace': 'pre-wrap',
+                               'padding': '12px', 'backgroundColor': COLORS['light'],
+                               'borderRadius': '6px', 'maxHeight': '300px', 'overflow': 'auto'})
+            ], style={'padding': '0 12px 12px 12px'})
         ], style={
-            'padding': '8px 12px',
             'borderBottom': f'1px solid {COLORS["border"]}',
-            'backgroundColor': 'rgba(239, 68, 68, 0.05)' if is_parasitic else 'transparent'
+            'marginBottom': '2px'
         })
 
         if is_pre:
@@ -1514,36 +1652,85 @@ def display_user_timeline(username):
         else:
             post_items.append(item)
 
+    # Build correlation chart
+    correlation_chart = None
+    if total_pre_posts > 0:
+        # Calculate percentages
+        tag_data = []
+        for tag_name, count in pre_tag_counts.items():
+            if count > 0:
+                indicator = PRE_PARASITIC_INDICATORS.get(tag_name, {})
+                tag_data.append({
+                    'indicator': indicator.get('label', tag_name),
+                    'count': count,
+                    'color': indicator.get('color', '#6b7280')
+                })
+
+        if tag_data:
+            tag_data.sort(key=lambda x: x['count'], reverse=True)
+
+            # Create bar chart
+            fig = go.Figure()
+            fig.add_trace(go.Bar(
+                x=[d['indicator'] for d in tag_data],
+                y=[d['count'] for d in tag_data],
+                marker_color=[d['color'] for d in tag_data],
+                text=[d['count'] for d in tag_data],
+                textposition='outside'
+            ))
+            fig.update_layout(
+                title=f'Pre-Parasitic Risk Indicators ({pre_posts_with_tags}/{total_pre_posts} posts tagged)',
+                height=250,
+                margin=dict(l=20, r=20, t=40, b=60),
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                yaxis=dict(showgrid=True, gridcolor=COLORS['border'], title='Pattern Matches'),
+                xaxis=dict(tickangle=-45),
+                showlegend=False
+            )
+            correlation_chart = dcc.Graph(figure=fig, config={'displayModeBar': False})
+
     # Build display
     sections = []
 
+    # Add correlation chart first
+    if correlation_chart:
+        sections.append(html.Div([
+            correlation_chart,
+            html.P("Higher counts may indicate vulnerability factors present before parasitic engagement.",
+                  style={'fontSize': '11px', 'color': COLORS['muted'], 'textAlign': 'center',
+                         'margin': '8px 0 16px 0', 'fontStyle': 'italic'})
+        ]))
+
     if pre_items:
         sections.append(html.Div([
-            html.H4("Before First Parasitic Post",
+            html.H4(f"Before First Parasitic Post ({len(pre_items)} posts)",
                    style={'fontSize': '13px', 'color': COLORS['success'], 'margin': '0 0 8px 0',
                           'padding': '8px', 'backgroundColor': 'rgba(16, 185, 129, 0.1)',
                           'borderRadius': '4px'}),
-            html.Div(pre_items[:20])  # Limit to 20
+            html.Div(pre_items[:30])  # Limit to 30
         ]))
 
     if post_items:
         sections.append(html.Div([
-            html.H4("After First Parasitic Post",
+            html.H4(f"After First Parasitic Post ({len(post_items)} posts)",
                    style={'fontSize': '13px', 'color': COLORS['danger'], 'margin': '16px 0 8px 0',
                           'padding': '8px', 'backgroundColor': 'rgba(239, 68, 68, 0.1)',
                           'borderRadius': '4px'}),
-            html.Div(post_items[:20])  # Limit to 20
+            html.Div(post_items[:30])  # Limit to 30
         ]))
 
     # Summary stats
-    pre_parasitic_count = sum(1 for t in timeline if t[6] and t[7])
-    post_parasitic_count = sum(1 for t in timeline if t[6] and not t[7])
+    pre_parasitic_count = sum(1 for t in timeline if t[7] and t[8])
+    post_parasitic_count = sum(1 for t in timeline if t[7] and not t[8])
 
     summary = html.Div([
-        html.P(f"Pre-parasitic period: {len(pre_items)} posts ({pre_parasitic_count} flagged)",
+        html.P(f"Pre-parasitic period: {len(pre_items)} posts ({pre_parasitic_count} flagged as parasitic)",
               style={'fontSize': '12px', 'margin': '0'}),
-        html.P(f"Post-parasitic period: {len(post_items)} posts ({post_parasitic_count} flagged)",
-              style={'fontSize': '12px', 'margin': '4px 0 0 0'})
+        html.P(f"Post-parasitic period: {len(post_items)} posts ({post_parasitic_count} flagged as parasitic)",
+              style={'fontSize': '12px', 'margin': '4px 0 0 0'}),
+        html.P(f"Risk indicators found in {pre_posts_with_tags} pre-parasitic posts",
+              style={'fontSize': '12px', 'margin': '4px 0 0 0', 'fontWeight': '500'})
     ], style={'padding': '12px', 'backgroundColor': COLORS['light'], 'borderRadius': '6px',
               'marginBottom': '12px'})
 

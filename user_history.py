@@ -324,6 +324,13 @@ def get_high_score_users(conn, min_score: float = 0.3, min_posts: int = 3, limit
     return cursor.fetchall()
 
 
+def get_existing_users(conn):
+    """Get usernames already in user_histories."""
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT username FROM user_histories")
+    return {row[0] for row in cursor.fetchall()}
+
+
 def scrape_high_score_users(conn, limit: int = 50, posts_per_user: int = 500):
     """
     Scrape history for highest-score users.
@@ -339,9 +346,19 @@ def scrape_high_score_users(conn, limit: int = 50, posts_per_user: int = 500):
     users = get_high_score_users(conn, min_score=0.3, min_posts=3, limit=limit)
     print(f"Found {len(users)} high-score users to analyze")
 
+    # Skip users already scraped
+    existing = get_existing_users(conn)
+    print(f"Skipping {len(existing)} users already in database: {existing}")
+
     total_stored = 0
+    processed = 0
 
     for i, (username, avg_score, post_count, first_parasitic_date) in enumerate(users):
+        if username in existing:
+            print(f"\n[{i+1}/{len(users)}] SKIP {username} (already scraped)")
+            continue
+
+        processed += 1
         print(f"\n[{i+1}/{len(users)}] {username} (avg_score: {avg_score:.2f}, posts: {post_count})")
 
         stored = 0
