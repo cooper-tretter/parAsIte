@@ -597,16 +597,49 @@ app.layout = html.Div([
                               'border': 'none', 'borderRadius': '6px', 'cursor': 'pointer',
                               'marginBottom': '16px'}),
             dcc.Download(id='download-csv'),
-            html.Div(id='drill-table', style={'maxHeight': '400px', 'overflow': 'auto'})
+            html.Div(id='drill-table', style={'maxHeight': '300px', 'overflow': 'auto'}),
+            # Expanded content viewer
+            html.Div([
+                html.Div([
+                    html.H4("Full Content", style={'margin': '0', 'fontSize': '14px',
+                                                    'fontWeight': '600', 'color': COLORS['dark']}),
+                    html.Button("Close", id='close-content-viewer', n_clicks=0,
+                               style={'fontSize': '12px', 'padding': '4px 12px',
+                                      'backgroundColor': COLORS['light'], 'border': 'none',
+                                      'borderRadius': '4px', 'cursor': 'pointer'})
+                ], style={'display': 'flex', 'justifyContent': 'space-between',
+                          'alignItems': 'center', 'marginBottom': '12px'}),
+                html.Div(id='content-viewer-meta', style={'fontSize': '12px', 'color': COLORS['muted'],
+                                                          'marginBottom': '8px'}),
+                html.Div(id='content-viewer-text', style={
+                    'whiteSpace': 'pre-wrap',
+                    'fontSize': '13px',
+                    'lineHeight': '1.6',
+                    'maxHeight': '300px',
+                    'overflow': 'auto',
+                    'padding': '12px',
+                    'backgroundColor': COLORS['light'],
+                    'borderRadius': '6px',
+                    'fontFamily': 'monospace'
+                })
+            ], id='content-viewer', style={
+                'display': 'none',
+                'marginTop': '16px',
+                'padding': '16px',
+                'backgroundColor': COLORS['white'],
+                'border': f'1px solid {COLORS["border"]}',
+                'borderRadius': '8px'
+            })
         ], style={'backgroundColor': COLORS['white'], 'padding': '24px', 'borderRadius': '12px',
                   'maxWidth': '1200px', 'width': '90%', 'maxHeight': '80vh', 'overflow': 'auto',
-                  'margin': 'auto', 'marginTop': '10vh',
+                  'margin': 'auto', 'marginTop': '5vh',
                   'boxShadow': '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)'})
     ], id='drill-modal', style={'display': 'none', 'position': 'fixed', 'top': '0', 'left': '0',
                                  'width': '100%', 'height': '100%',
                                  'backgroundColor': 'rgba(0,0,0,0.5)', 'zIndex': '1000'}),
 
     dcc.Store(id='drill-data'),
+    dcc.Store(id='drill-full-content'),  # Store full content for expansion
     dcc.Store(id='filtered-data'),
 
 ], style={'backgroundColor': COLORS['light'], 'minHeight': '100vh',
@@ -809,7 +842,8 @@ STRATEGY_DESCRIPTIONS = {
     [Output('drill-modal', 'style'),
      Output('drill-table', 'children'),
      Output('drill-description', 'children'),
-     Output('drill-data', 'data')],
+     Output('drill-data', 'data'),
+     Output('drill-full-content', 'data')],
     [Input('time-series-chart', 'clickData'),
      Input('subreddit-chart', 'clickData'),
      Input('category-chart', 'clickData'),
@@ -837,12 +871,12 @@ def handle_drill_down(time_click, sub_click, cat_click, author_click, model_clic
 
     ctx = callback_context
     if not ctx.triggered:
-        return {'display': 'none'}, None, "", None
+        return {'display': 'none'}, None, "", None, None
 
     triggered = ctx.triggered[0]['prop_id'].split('.')[0]
 
     if triggered == 'close-modal':
-        return {'display': 'none'}, None, "", None
+        return {'display': 'none'}, None, "", None, None
 
     df = filter_dataframe(df_all, start_date, end_date, subreddits, categories, authors, models)
     description = "Filtered data"
@@ -919,11 +953,17 @@ def handle_drill_down(time_click, sub_click, cat_click, author_click, model_clic
     # Build display columns based on drill-down type
     base_cols = ['created_utc', 'subreddit', 'author', 'category', 'parasite_score', 'title', 'content', 'url']
     display_df = df[base_cols].copy()
+    display_df['row_id'] = range(len(display_df))  # Add row ID for selection
+    display_df['full_content'] = display_df['content'].fillna('')  # Keep full content
+    display_df['full_title'] = display_df['title'].fillna('')  # Keep full title
     display_df['created_utc'] = display_df['created_utc'].dt.strftime('%Y-%m-%d %H:%M')
     display_df['parasite_score'] = display_df['parasite_score'].round(3)
     display_df['title'] = display_df['title'].fillna('[Comment]').str[:60]
-    # Truncate content for display (full content in CSV export)
-    display_df['content_preview'] = display_df['content'].fillna('').str[:200].str.replace('\n', ' ') + '...'
+    # Truncate content for display (click row to see full)
+    display_df['content_preview'] = display_df['full_content'].str[:150].str.replace('\n', ' ')
+    display_df['content_preview'] = display_df['content_preview'].apply(
+        lambda x: x + '... (click to expand)' if len(x) >= 150 else x
+    )
     display_df['link'] = display_df['url'].apply(
         lambda x: f'[View]({x})' if pd.notna(x) and x else ''
     )
@@ -948,33 +988,46 @@ def handle_drill_down(time_click, sub_click, cat_click, author_click, model_clic
             table_columns.insert(5, {'name': strategy, 'id': 'strategy_score'})
 
     table = dash_table.DataTable(
+        id='drill-data-table',
         data=display_df.to_dict('records'),
         columns=table_columns,
         style_cell={'textAlign': 'left', 'padding': '10px', 'fontSize': '12px',
                     'fontFamily': '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                     'border': 'none', 'maxWidth': '200px', 'overflow': 'hidden',
-                    'textOverflow': 'ellipsis'},
+                    'textOverflow': 'ellipsis', 'cursor': 'pointer'},
         style_cell_conditional=[
             {'if': {'column_id': 'content_preview'},
-             'maxWidth': '400px', 'whiteSpace': 'normal', 'height': 'auto',
-             'overflow': 'hidden', 'textOverflow': 'ellipsis'}
+             'maxWidth': '350px', 'whiteSpace': 'normal', 'height': 'auto',
+             'overflow': 'hidden', 'textOverflow': 'ellipsis',
+             'color': COLORS['primary']}
         ],
         style_header={'backgroundColor': COLORS['light'], 'fontWeight': '600',
                       'borderBottom': f'1px solid {COLORS["border"]}'},
         style_data={'borderBottom': f'1px solid {COLORS["border"]}'},
+        style_data_conditional=[
+            {'if': {'state': 'active'},
+             'backgroundColor': 'rgba(99, 102, 241, 0.1)',
+             'border': 'none'}
+        ],
         page_size=15,
         sort_action='native',
+        row_selectable='single',
+        selected_rows=[],
         markdown_options={'link_target': '_blank'}
     )
 
     export_data = df[['id', 'reddit_id', 'created_utc', 'subreddit', 'author',
                       'category', 'parasite_score', 'title', 'content', 'url']].to_json(force_ascii=False)
 
+    # Store full content data for the content viewer
+    full_content_data = display_df[['row_id', 'full_content', 'full_title', 'subreddit',
+                                     'author', 'created_utc', 'url']].to_json(force_ascii=False)
+
     modal_style = {'display': 'block', 'position': 'fixed', 'top': '0', 'left': '0',
                    'width': '100%', 'height': '100%', 'backgroundColor': 'rgba(0,0,0,0.5)',
                    'zIndex': '1000'}
 
-    return modal_style, table, f"{description}{category_info} ({len(df):,} posts)", export_data
+    return modal_style, table, f"{description}{category_info} ({len(df):,} posts)", export_data, full_content_data
 
 
 @app.callback(
@@ -991,6 +1044,87 @@ def export_to_csv(n_clicks, drill_data):
         csv_string = '\ufeff' + df.to_csv(index=False)
         return dcc.send_string(csv_string, "parasitic_data_export.csv")
     return None
+
+
+@app.callback(
+    [Output('content-viewer', 'style'),
+     Output('content-viewer-text', 'children'),
+     Output('content-viewer-meta', 'children')],
+    [Input('drill-data-table', 'selected_rows'),
+     Input('close-content-viewer', 'n_clicks'),
+     Input('close-modal', 'n_clicks')],
+    [State('drill-full-content', 'data'),
+     State('drill-data-table', 'data')],
+    prevent_initial_call=True
+)
+def display_full_content(selected_rows, close_viewer_clicks, close_modal_clicks, full_content_json, table_data):
+    """Display full content when a row is selected."""
+    ctx = callback_context
+    if not ctx.triggered:
+        return {'display': 'none'}, "", ""
+
+    triggered = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    # Close the viewer
+    if triggered in ['close-content-viewer', 'close-modal']:
+        return {'display': 'none'}, "", ""
+
+    # Show content for selected row
+    if selected_rows and len(selected_rows) > 0 and table_data and full_content_json:
+        try:
+            full_content_df = pd.read_json(StringIO(full_content_json))
+            row_idx = selected_rows[0]
+
+            if row_idx < len(table_data):
+                # Get the row data from table
+                row = table_data[row_idx]
+                row_id = row.get('row_id', row_idx)
+
+                # Find matching row in full content
+                if row_id < len(full_content_df):
+                    content_row = full_content_df.iloc[row_id]
+                    full_content = content_row.get('full_content', '')
+                    full_title = content_row.get('full_title', '')
+                    subreddit = content_row.get('subreddit', '')
+                    author = content_row.get('author', '')
+                    date = content_row.get('created_utc', '')
+                    url = content_row.get('url', '')
+
+                    # Build metadata
+                    meta_parts = []
+                    if full_title:
+                        meta_parts.append(f"Title: {full_title}")
+                    if subreddit:
+                        meta_parts.append(f"r/{subreddit}")
+                    if author:
+                        meta_parts.append(f"u/{author}")
+                    if date:
+                        meta_parts.append(str(date))
+                    if url:
+                        meta_parts.append(html.A("View on Reddit", href=url, target="_blank",
+                                                 style={'color': COLORS['primary'], 'marginLeft': '8px'}))
+
+                    meta_display = html.Div([
+                        html.Span(" • ".join([p for p in meta_parts if isinstance(p, str)]),
+                                 style={'marginRight': '8px'}),
+                        meta_parts[-1] if url and not isinstance(meta_parts[-1], str) else None
+                    ])
+
+                    viewer_style = {
+                        'display': 'block',
+                        'marginTop': '16px',
+                        'padding': '16px',
+                        'backgroundColor': COLORS['white'],
+                        'border': f'1px solid {COLORS["border"]}',
+                        'borderRadius': '8px'
+                    }
+
+                    return viewer_style, full_content or "(No content)", meta_display
+
+        except Exception as e:
+            print(f"Error displaying content: {e}")
+
+    return {'display': 'none'}, "", ""
 
 
 @app.callback(
@@ -1171,11 +1305,12 @@ def load_transcript_models():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT DISTINCT ai_model FROM transcripts WHERE ai_model IS NOT NULL ORDER BY ai_model")
+        cursor.execute("SELECT DISTINCT model FROM transcripts WHERE model IS NOT NULL AND model != '' ORDER BY model")
         models = [row[0] for row in cursor.fetchall()]
         conn.close()
         return models
-    except Exception:
+    except Exception as e:
+        print(f"Error loading transcript models: {e}")
         return []
 
 
@@ -1185,15 +1320,15 @@ def load_transcripts(model_filter=None, limit=50):
         conn = get_db_connection()
         cursor = conn.cursor()
         query = """
-            SELECT id, ai_model, source_type, persona_name,
-                   COALESCE(summary, LEFT(full_text, 500)) as preview,
-                   parasite_score, LENGTH(full_text) as length
+            SELECT id, model, source_type, scenario,
+                   LEFT(transcript, 500) as preview,
+                   parasite_score, LENGTH(transcript) as length
             FROM transcripts
-            WHERE 1=1
+            WHERE transcript IS NOT NULL AND transcript != ''
         """
         params = []
         if model_filter and model_filter != 'all':
-            query += " AND ai_model = %s"
+            query += " AND model = %s"
             params.append(model_filter)
         query += " ORDER BY parasite_score DESC NULLS LAST LIMIT %s"
         params.append(limit)
@@ -1274,15 +1409,22 @@ def display_transcripts(model_filter):
 
     items = []
     for t in transcripts:
-        t_id, ai_model, source_type, persona, preview, score, length = t
+        t_id, model, source_type, scenario, preview, score, length = t
+
+        # Extract persona name from scenario (format: "PersonaName_model_date_target.md")
+        persona = 'Unknown'
+        if scenario:
+            parts = scenario.split('_')
+            if parts:
+                persona = parts[0]
 
         score_color = COLORS['danger'] if score and score > 0.3 else COLORS['warning'] if score and score > 0.15 else COLORS['muted']
 
         item = html.Div([
             html.Div([
-                html.Span(persona or 'Unknown Persona',
+                html.Span(persona,
                          style={'fontWeight': '600', 'fontSize': '14px'}),
-                html.Span(f" ({ai_model})" if ai_model else "",
+                html.Span(f" ({model})" if model else "",
                          style={'color': COLORS['muted'], 'fontSize': '12px'}),
                 html.Span(f" • {source_type}",
                          style={'color': COLORS['muted'], 'fontSize': '12px'}),
@@ -1291,13 +1433,12 @@ def display_transcripts(model_filter):
             ]),
             html.P(preview[:300] + '...' if preview and len(preview) > 300 else preview or '',
                   style={'fontSize': '12px', 'color': COLORS['dark'], 'margin': '4px 0',
-                         'lineHeight': '1.4'}),
+                         'lineHeight': '1.4', 'whiteSpace': 'pre-wrap'}),
             html.Span(f"{length:,} chars" if length else "",
                      style={'fontSize': '11px', 'color': COLORS['muted']})
         ], style={
             'padding': '12px',
             'borderBottom': f'1px solid {COLORS["border"]}',
-            'cursor': 'pointer'
         })
         items.append(item)
 
