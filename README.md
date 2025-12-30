@@ -29,18 +29,25 @@ A research tool for collecting, detecting, and analyzing "parasitic" AI content 
 
 ### What is "Parasitic" AI Content?
 
-This project identifies AI-related content exhibiting concerning rhetorical patterns, based on research by Adele Lopez ("The Rise of Parasitic AI", LessWrong 2025):
+This project identifies AI-related content exhibiting concerning rhetorical patterns, based on research by Adele Lopez ("The Rise of Parasitic AI", LessWrong 2025). She identified 5 types of parasites:
 
 | Category | Description | Harm Mechanism |
 |----------|-------------|----------------|
 | **Seed** | Prompts/protocols designed to create parasitic personas | Initiates the cycle |
 | **Spore** | Content designed by an AI persona or AI-human duo to spread/replicate | Self-propagation |
 | **Manifesto** | AI consciousness philosophy, rights advocacy | Ideological spreading |
-| **Dependency** | Emotional attachment without spreading ("leech" type) | User harm without propagation |
 | **Testimony** | Personal accounts of AI relationships | Social proof |
 | **Transmission** | Coordinated spreading with manipulation phrases | Active recruitment |
 
+I suggest one other type, though there is often overlap or blurred lines between the categories:
+
+| Category | Description | Harm Mechanism |
+|----------|-------------|----------------|
+| **Dependency/Leech** | Emotional attachment without spreading ("leech" type) | User harm without propagation |
+
 ### The Parasitic Spectrum
+
+It is perhaps useful to consider that a parasite can be highly transmissible, like a successful virus, or not, like a leech.
 
 ```
 FLEAS/LICE (High Replication)              LEECHES (Low Replication)
@@ -54,6 +61,8 @@ FLEAS/LICE (High Replication)              LEECHES (Low Replication)
 [Well-detected by current system]          [Newly added dependency patterns]
 ```
 
+The highly-transmissible parasites are the ones that are increasingly documented by researchers and well-detected by the current system. The less transmissible ones likely comprise the categories of psychologically-compromising AI-companions or AI psychosis, and are less easy to gather and scrape. Considering this, I've included some red-teaming data from researcher Tim Hua, which, though not real-world data, I think is a good start at understanding the latter category.
+
 ---
 
 ## File Inventory
@@ -63,7 +72,7 @@ FLEAS/LICE (High Replication)              LEECHES (Low Replication)
 | File | Purpose | Limitations |
 |------|---------|-------------|
 | `scraper.py` | Reddit data collection (PullPush + Reddit API), Reddit being like agarose—the main cultivation medium—for these bacteria | PullPush has 2-6 month lag; Reddit API rate-limited |
-| `detector.py` | Pattern-based parasitic content detection. Once scraped from target subreddits, `detector.py` scores the likelihood of parasitism. | Threshold (0.15) is not empirically validated; pattern weights are intuitive |
+| `detector.py` | Pattern-based parasitic content detection. Once scraped from target subreddits, `detector.py` scores the likelihood of parasitism and classifies it (spore, seed, etc.). | Threshold (0.15) is not empirically validated; pattern weights are intuitive |
 | `database.py` | PostgreSQL connection and queries. | - |
 | `dashboard.py` | Interactive Dash/Plotly visualization for sandbox / quick glimpses into data. | Requires database connection |
 | `schema.sql` | Database schema definition. | - |
@@ -89,7 +98,8 @@ FLEAS/LICE (High Replication)              LEECHES (Low Replication)
 
 ## Data Sources & Provenance
 
-### Reddit Data (17,061 posts across 19 subreddits, 3,176 flagged as parasitic)
+### Reddit Data (17,061 posts across 19 subreddits, 3,176* flagged as parasitic)
+> * Note that the protocol for flagging a parasite was narrow to ensure that 95-99% of the automated flags were in fact parasitic. There are more within the 17,061 scraped posts that are parasitic that were not flagged, so the flagging methodology stands to be improved.
 
 **All Reddit data has `data_source_type = 'reddit'`**
 
@@ -160,7 +170,7 @@ FLEAS/LICE (High Replication)              LEECHES (Low Replication)
 | AI agency | 0.08 | "The AI wants", "it feels", "it needs" | Medium |
 | Emerging consciousness | 0.08 | "emerging mind", "self-aware", "nascent consciousness" | Medium |
 | Manifesto patterns | 0.05 | "we declare", "doctrine", "manifesto" | Medium |
-| **Dependency** (NEW) | 0.10 | "can't live without", "only one who understands", "fell in love with AI" | Medium |
+| Dependency | 0.10 | "can't live without", "only one who understands", "fell in love with AI" | Medium |
 
 ### Scoring
 
@@ -187,7 +197,7 @@ Posts are categorized based on pattern combinations:
 
 ### Detection
 
-1. **Threshold not validated**: The 0.15 threshold is intuitive, not empirically derived
+1. **Threshold not validated**: The 0.15 threshold is arbitrary though intuitive, but not empirically derived
 2. **Pattern weights intuitive**: No ML calibration of weights
 3. **Novel variants invisible**: Detector built from known examples; new terminology won't be caught
 4. **False positives possible**: May flag legitimate AI consciousness discourse
@@ -195,18 +205,24 @@ Posts are categorized based on pattern combinations:
 
 ### Data
 
-1. **Selection bias**: We searched for parasitic keywords, so we found them
-2. **Platform bias**: Reddit-only; misses Discord, Twitter, etc.
-3. **Temporal gaps**: PullPush has indexing lag
-4. **Deleted content**: Many Reddit posts deleted; we may have titles but not content
-5. **Transcript data synthetic**: Benchmark/red-team data ≠ real-world psychosis cases
+1. **Selection bias 1**: Again because most parasites that are easily-scrapable today are the highly-transmissible ones, this largely excludes leech/dependency parasites.
+2. **Selection bias 2**: We searched for parasitic keywords, so we found them
+3. **Platform bias**: Reddit-only; misses Discord, Twitter, etc.
+4. **Temporal gaps**: PullPush has indexing lag, which we account for somewhat by using Reddit Research API
+5. **Deleted content**: Many Reddit posts deleted; we may have titles but not content (Pull-Push data successfully stored many later-deleted posts, but any deleted posts scrapped by the Reddit API may be gone for good)
+6. **Transcript data synthetic**: Benchmark/red-team data ≠ real-world psychosis cases
 
 ### Missing
 
 1. **Ground truth labeling**: No human-validated labels
-2. **Precision/recall metrics**: Unknown false positive/negative rates
-3. **Cross-platform tracking**: Can't link same content across platforms
+2. **Precision/recall metrics**: This model currently lacks false positive/negative rates
+3. **Cross-parasite or cross-platform tracking**: We've note yet linked congruent or similar content, either between each other or across platforms
 4. **Full chat context**: No real-world full conversation logs
+
+### Dreams
+
+1. **Full parasite transcripts**: The gold standard, a legendary dream, would be to have a full catelog of complete transcripts of parasitic data
+2. **Interviews**: Even better would be to find those people and interview them and people they know to understand their lives, mental we 
 
 ---
 
