@@ -499,6 +499,84 @@ app.layout = html.Div([
 
     ], style={'padding': '20px 32px', 'maxWidth': '1400px', 'margin': '0 auto'}),
 
+    # Extended Research Data Section
+    html.Div([
+        html.H2("Extended Research Data",
+               style={'fontSize': '18px', 'fontWeight': '600', 'color': COLORS['dark'],
+                      'marginBottom': '16px'}),
+
+        # Two-column layout for Transcripts and User Timeline
+        html.Div([
+            # Transcripts Card
+            html.Div([
+                html.Div([
+                    html.H3("AI Psychosis Transcripts",
+                           style={'fontSize': '16px', 'fontWeight': '600', 'margin': '0',
+                                  'color': COLORS['dark']}),
+                    html.P("Red-team conversation logs (Tim Hua repository)",
+                          style={'fontSize': '12px', 'color': COLORS['muted'], 'margin': '4px 0 0 0'})
+                ], style={'marginBottom': '16px'}),
+
+                html.Div([
+                    html.Label("Select Model:", style={'fontSize': '12px', 'fontWeight': '500',
+                                                       'color': COLORS['muted'], 'marginBottom': '4px',
+                                                       'display': 'block'}),
+                    dcc.Dropdown(
+                        id='transcript-model-filter',
+                        options=[{'label': 'All Models', 'value': 'all'}],
+                        value='all',
+                        clearable=False,
+                        style={'marginBottom': '12px'}
+                    ),
+                ]),
+
+                html.Div(id='transcript-list', style={'maxHeight': '400px', 'overflow': 'auto'})
+            ], style={
+                'backgroundColor': COLORS['white'],
+                'borderRadius': '12px',
+                'padding': '20px',
+                'boxShadow': '0 1px 3px rgba(0,0,0,0.1)',
+                'border': f'1px solid {COLORS["border"]}',
+                'flex': '1',
+                'minWidth': '400px'
+            }),
+
+            # User Timeline Card
+            html.Div([
+                html.Div([
+                    html.H3("User Timeline Analysis",
+                           style={'fontSize': '16px', 'fontWeight': '600', 'margin': '0',
+                                  'color': COLORS['dark']}),
+                    html.P("Pre/post parasitic behavior comparison",
+                          style={'fontSize': '12px', 'color': COLORS['muted'], 'margin': '4px 0 0 0'})
+                ], style={'marginBottom': '16px'}),
+
+                html.Div([
+                    html.Label("Select User:", style={'fontSize': '12px', 'fontWeight': '500',
+                                                      'color': COLORS['muted'], 'marginBottom': '4px',
+                                                      'display': 'block'}),
+                    dcc.Dropdown(
+                        id='user-timeline-dropdown',
+                        options=[],
+                        placeholder='Select a high-score user...',
+                        style={'marginBottom': '12px'}
+                    ),
+                ]),
+
+                html.Div(id='user-timeline-display', style={'maxHeight': '400px', 'overflow': 'auto'})
+            ], style={
+                'backgroundColor': COLORS['white'],
+                'borderRadius': '12px',
+                'padding': '20px',
+                'boxShadow': '0 1px 3px rgba(0,0,0,0.1)',
+                'border': f'1px solid {COLORS["border"]}',
+                'flex': '1',
+                'minWidth': '400px'
+            })
+        ], style={'display': 'flex', 'gap': '20px', 'flexWrap': 'wrap'})
+
+    ], style={'padding': '20px 32px', 'maxWidth': '1400px', 'margin': '0 auto'}),
+
     # Drill-down Modal
     html.Div([
         html.Div([
@@ -1082,6 +1160,253 @@ def update_affect_radar(slider_value, start_date, end_date, subreddits, categori
     time_label = f"{filter_start.strftime('%b %d, %Y')} - {filter_end.strftime('%b %d, %Y')} ({len(time_filtered):,} posts)"
 
     return fig, 0, 100, marks, slider_value, time_label
+
+
+# =====================================
+# Extended Research Data Callbacks
+# =====================================
+
+def load_transcript_models():
+    """Get unique AI models from transcripts table."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT DISTINCT ai_model FROM transcripts WHERE ai_model IS NOT NULL ORDER BY ai_model")
+        models = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        return models
+    except Exception:
+        return []
+
+
+def load_transcripts(model_filter=None, limit=50):
+    """Load transcripts from database."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        query = """
+            SELECT id, ai_model, source_type, persona_name,
+                   COALESCE(summary, LEFT(full_text, 500)) as preview,
+                   parasite_score, LENGTH(full_text) as length
+            FROM transcripts
+            WHERE 1=1
+        """
+        params = []
+        if model_filter and model_filter != 'all':
+            query += " AND ai_model = %s"
+            params.append(model_filter)
+        query += " ORDER BY parasite_score DESC NULLS LAST LIMIT %s"
+        params.append(limit)
+
+        cursor.execute(query, params)
+        results = cursor.fetchall()
+        conn.close()
+        return results
+    except Exception as e:
+        print(f"Error loading transcripts: {e}")
+        return []
+
+
+def load_users_with_history():
+    """Get users who have history data."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT username, COUNT(*) as post_count,
+                   AVG(parasite_score) as avg_score,
+                   SUM(CASE WHEN is_pre_parasitic THEN 1 ELSE 0 END) as pre_count,
+                   SUM(CASE WHEN is_pre_parasitic = false THEN 1 ELSE 0 END) as post_count
+            FROM user_histories
+            GROUP BY username
+            ORDER BY avg_score DESC NULLS LAST
+        """)
+        results = cursor.fetchall()
+        conn.close()
+        return results
+    except Exception:
+        return []
+
+
+def load_user_timeline(username):
+    """Load timeline data for a specific user."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT created_at, post_type, subreddit, title,
+                   LEFT(content, 300) as preview, parasite_score,
+                   is_parasitic, is_pre_parasitic
+            FROM user_histories
+            WHERE username = %s
+            ORDER BY created_at ASC
+        """, (username,))
+        results = cursor.fetchall()
+        conn.close()
+        return results
+    except Exception as e:
+        print(f"Error loading user timeline: {e}")
+        return []
+
+
+@app.callback(
+    Output('transcript-model-filter', 'options'),
+    Input('transcript-model-filter', 'id')  # Trigger on load
+)
+def populate_transcript_models(_):
+    """Populate model filter dropdown."""
+    models = load_transcript_models()
+    options = [{'label': 'All Models', 'value': 'all'}]
+    options.extend([{'label': m, 'value': m} for m in models])
+    return options
+
+
+@app.callback(
+    Output('transcript-list', 'children'),
+    Input('transcript-model-filter', 'value')
+)
+def display_transcripts(model_filter):
+    """Display transcript list."""
+    transcripts = load_transcripts(model_filter)
+
+    if not transcripts:
+        return html.P("No transcripts found.", style={'color': COLORS['muted']})
+
+    items = []
+    for t in transcripts:
+        t_id, ai_model, source_type, persona, preview, score, length = t
+
+        score_color = COLORS['danger'] if score and score > 0.3 else COLORS['warning'] if score and score > 0.15 else COLORS['muted']
+
+        item = html.Div([
+            html.Div([
+                html.Span(persona or 'Unknown Persona',
+                         style={'fontWeight': '600', 'fontSize': '14px'}),
+                html.Span(f" ({ai_model})" if ai_model else "",
+                         style={'color': COLORS['muted'], 'fontSize': '12px'}),
+                html.Span(f" • {source_type}",
+                         style={'color': COLORS['muted'], 'fontSize': '12px'}),
+                html.Span(f" • Score: {score:.2f}" if score else "",
+                         style={'color': score_color, 'fontSize': '12px', 'marginLeft': '8px'}),
+            ]),
+            html.P(preview[:300] + '...' if preview and len(preview) > 300 else preview or '',
+                  style={'fontSize': '12px', 'color': COLORS['dark'], 'margin': '4px 0',
+                         'lineHeight': '1.4'}),
+            html.Span(f"{length:,} chars" if length else "",
+                     style={'fontSize': '11px', 'color': COLORS['muted']})
+        ], style={
+            'padding': '12px',
+            'borderBottom': f'1px solid {COLORS["border"]}',
+            'cursor': 'pointer'
+        })
+        items.append(item)
+
+    return items
+
+
+@app.callback(
+    Output('user-timeline-dropdown', 'options'),
+    Input('user-timeline-dropdown', 'id')  # Trigger on load
+)
+def populate_user_dropdown(_):
+    """Populate user dropdown with users who have history."""
+    users = load_users_with_history()
+    options = []
+    for username, total, avg_score, pre, post in users:
+        label = f"{username} ({total} posts, avg: {avg_score:.2f})"
+        options.append({'label': label, 'value': username})
+    return options
+
+
+@app.callback(
+    Output('user-timeline-display', 'children'),
+    Input('user-timeline-dropdown', 'value')
+)
+def display_user_timeline(username):
+    """Display user timeline with pre/post parasitic markers."""
+    if not username:
+        return html.P("Select a user to view their timeline.",
+                     style={'color': COLORS['muted'], 'textAlign': 'center', 'padding': '40px'})
+
+    timeline = load_user_timeline(username)
+
+    if not timeline:
+        return html.P("No timeline data found.", style={'color': COLORS['muted']})
+
+    # Group by pre/post parasitic
+    pre_items = []
+    post_items = []
+
+    for created, post_type, subreddit, title, preview, score, is_parasitic, is_pre in timeline:
+        score_color = COLORS['danger'] if score and score > 0.3 else COLORS['warning'] if score and score > 0.15 else COLORS['muted']
+        parasitic_badge = html.Span("PARASITIC", style={
+            'backgroundColor': COLORS['danger'],
+            'color': 'white',
+            'padding': '2px 6px',
+            'borderRadius': '4px',
+            'fontSize': '10px',
+            'marginLeft': '8px'
+        }) if is_parasitic else None
+
+        item = html.Div([
+            html.Div([
+                html.Span(created.strftime('%Y-%m-%d') if created else '',
+                         style={'fontSize': '11px', 'color': COLORS['muted']}),
+                html.Span(f" • r/{subreddit}" if subreddit else "",
+                         style={'fontSize': '11px', 'color': COLORS['muted']}),
+                html.Span(f" • {post_type}",
+                         style={'fontSize': '11px', 'color': COLORS['muted']}),
+                parasitic_badge,
+            ]),
+            html.P(title or preview[:100] + '...' if preview else '',
+                  style={'fontSize': '12px', 'margin': '2px 0', 'fontWeight': '500'}),
+            html.Span(f"Score: {score:.3f}" if score else "",
+                     style={'fontSize': '11px', 'color': score_color})
+        ], style={
+            'padding': '8px 12px',
+            'borderBottom': f'1px solid {COLORS["border"]}',
+            'backgroundColor': 'rgba(239, 68, 68, 0.05)' if is_parasitic else 'transparent'
+        })
+
+        if is_pre:
+            pre_items.append(item)
+        else:
+            post_items.append(item)
+
+    # Build display
+    sections = []
+
+    if pre_items:
+        sections.append(html.Div([
+            html.H4("Before First Parasitic Post",
+                   style={'fontSize': '13px', 'color': COLORS['success'], 'margin': '0 0 8px 0',
+                          'padding': '8px', 'backgroundColor': 'rgba(16, 185, 129, 0.1)',
+                          'borderRadius': '4px'}),
+            html.Div(pre_items[:20])  # Limit to 20
+        ]))
+
+    if post_items:
+        sections.append(html.Div([
+            html.H4("After First Parasitic Post",
+                   style={'fontSize': '13px', 'color': COLORS['danger'], 'margin': '16px 0 8px 0',
+                          'padding': '8px', 'backgroundColor': 'rgba(239, 68, 68, 0.1)',
+                          'borderRadius': '4px'}),
+            html.Div(post_items[:20])  # Limit to 20
+        ]))
+
+    # Summary stats
+    pre_parasitic_count = sum(1 for t in timeline if t[6] and t[7])
+    post_parasitic_count = sum(1 for t in timeline if t[6] and not t[7])
+
+    summary = html.Div([
+        html.P(f"Pre-parasitic period: {len(pre_items)} posts ({pre_parasitic_count} flagged)",
+              style={'fontSize': '12px', 'margin': '0'}),
+        html.P(f"Post-parasitic period: {len(post_items)} posts ({post_parasitic_count} flagged)",
+              style={'fontSize': '12px', 'margin': '4px 0 0 0'})
+    ], style={'padding': '12px', 'backgroundColor': COLORS['light'], 'borderRadius': '6px',
+              'marginBottom': '12px'})
+
+    return html.Div([summary] + sections)
 
 
 if __name__ == '__main__':

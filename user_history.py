@@ -173,7 +173,10 @@ class UserHistoryScraper:
         """Process a raw submission."""
         content = raw.get('selftext', '') or ''
         title = raw.get('title', '') or ''
-        created_at = datetime.fromtimestamp(raw.get('created_utc', 0))
+        created_utc = raw.get('created_utc', 0)
+        if isinstance(created_utc, str):
+            created_utc = int(float(created_utc))
+        created_at = datetime.fromtimestamp(created_utc)
 
         detection = detect_parasitic_content(content, title)
 
@@ -205,7 +208,10 @@ class UserHistoryScraper:
     ) -> dict:
         """Process a raw comment."""
         content = raw.get('body', '') or ''
-        created_at = datetime.fromtimestamp(raw.get('created_utc', 0))
+        created_utc = raw.get('created_utc', 0)
+        if isinstance(created_utc, str):
+            created_utc = int(float(created_utc))
+        created_at = datetime.fromtimestamp(created_utc)
 
         detection = detect_parasitic_content(content)
 
