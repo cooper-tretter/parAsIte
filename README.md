@@ -8,7 +8,7 @@ A research tool for collecting, detecting, and analyzing "parasitic" AI content 
 
 ## Quick Links
 
-- **Live Dashboard**: [Render Deployment URL]
+- **Live Dashboard**: https://parasite.onrender.com/ (takes a few minutes to load)
 - **Repository**: https://github.com/cooper-tretter/parAsIte
 
 ---
