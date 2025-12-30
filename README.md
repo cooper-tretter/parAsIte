@@ -89,7 +89,7 @@ FLEAS/LICE (High Replication)              LEECHES (Low Replication)
 
 ## Data Sources & Provenance
 
-### Reddit Data (11,443 posts across 19 subreddits)
+### Reddit Data (17,061 posts across 19 subreddits, 3,176 flagged as parasitic)
 
 **All Reddit data has `data_source_type = 'reddit'`**
 
