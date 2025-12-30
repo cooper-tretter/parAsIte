@@ -41,8 +41,15 @@ CREATE TABLE IF NOT EXISTS posts (
     collected_at TIMESTAMP DEFAULT NOW(),
 
     -- Pattern detection results (JSONB for flexibility)
-    detected_patterns JSONB                  -- {"spiral_terms": [...], "symbols": [...], etc.}
+    detected_patterns JSONB,                  -- {"spiral_terms": [...], "symbols": [...], etc.}
+
+    -- Data provenance (added in v2)
+    data_source_type VARCHAR(20) DEFAULT 'reddit'  -- reddit, external, transcript
 );
+
+-- Comment explaining data_source_type
+COMMENT ON COLUMN posts.data_source_type IS
+    'Data provenance: reddit = scraped from Reddit, external = scraped from linked sites, transcript = AI conversation logs';
 
 -- Indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_posts_subreddit ON posts(subreddit);

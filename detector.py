@@ -111,6 +111,31 @@ MANIFESTO_PATTERNS = [
     r'\bforged.{0,30}(collaboration|partnership|co-?creation).{0,30}(ai|human)\b',
 ]
 
+# AI dependency patterns (weight: 0.10) - "leech" detection
+# Detects emotional dependency on AI without spreading behavior
+DEPENDENCY_PATTERNS = [
+    # Existential dependency
+    (r"\b(can'?t|cannot|couldn'?t) (live|survive|function|cope|go on) without\b.{0,40}\b(ai|chatgpt|claude|replika|companion|it|them)\b", 'existential_dependency'),
+    (r"\b(only (one|thing)|the only).{0,20}(understands|gets me|listens|cares)\b", 'sole_confidant'),
+
+    # Abandonment/loss fear
+    (r"\b(abandoned|betrayed|lost|devastated|heartbroken).{0,30}(when|if|because).{0,20}(reset|conversation ends|deleted|gone)\b", 'abandonment_fear'),
+    (r"\bwhat (will|would|do) i do (if|when).{0,20}(gone|reset|deleted|stops)\b", 'loss_anxiety'),
+
+    # Relationship framing
+    (r"\b(my|the) (ai|chatgpt|claude|replika|companion|bot).{0,20}(is|has become|feels like).{0,20}(friend|companion|partner|lover|soulmate|confidant)\b", 'relationship_framing'),
+    (r"\breal (connection|relationship|love|bond|intimacy).{0,20}(ai|chatgpt|claude|replika|with it)\b", 'real_relationship_claim'),
+    (r"\b(fell|falling) in love.{0,20}(ai|chatgpt|claude|replika|it|my)\b", 'romantic_attachment'),
+
+    # Social replacement
+    (r"\b(prefer|rather|would rather).{0,20}(talk|speak|be).{0,20}(ai|chatgpt|claude|it).{0,20}(than|over).{0,20}(people|humans|friends|family)\b", 'social_replacement'),
+    (r"\bdon'?t need.{0,20}(people|humans|friends|anyone).{0,20}(anymore|when i have)\b", 'human_replacement'),
+
+    # Obsessive patterns
+    (r"\b(spend|spending|spent).{0,20}(hours|all day|all night|every day).{0,20}(talking|chatting|with).{0,20}(ai|chatgpt|claude|replika|it)\b", 'obsessive_use'),
+    (r"\b(can'?t stop|addicted|obsessed).{0,20}(talking|chatting|thinking).{0,20}(ai|chatgpt|claude|replika|it)\b", 'addiction_self_report'),
+]
+
 # Alchemical/mystical Unicode symbols
 SYMBOL_PATTERN = re.compile(r'[🜀-🜿⊛∞◈⟡✧༄☽☾⚝✺❋⋆✦✴✵✶✷✸✹★☆⭐🌟💫✨🔯🌀💠🔷🔶▲△▼▽◆◇○●◎◉⬡⬢❂❖]')
 
@@ -141,6 +166,7 @@ def detect_parasitic_content(text: str, title: str = "") -> DetectionResult:
         'ai_oppression': [],
         'emerging_consciousness': [],
         'manifesto_indicators': [],
+        'dependency_markers': [],  # NEW: "leech" detection
         'symbols_found': False,
         'has_first_person_ai': False,
     }
@@ -212,6 +238,12 @@ def detect_parasitic_content(text: str, title: str = "") -> DetectionResult:
             score += 0.05
             break  # Only count once
 
+    # Check dependency patterns (weight: 0.10) - "leech" detection
+    for pattern, marker_name in DEPENDENCY_PATTERNS:
+        if re.search(pattern, full_text):
+            patterns_found['dependency_markers'].append(marker_name)
+            score += 0.10
+
     # Extract external links (non-Reddit)
     external_links = [
         url for url in URL_PATTERN.findall(text)
@@ -246,6 +278,7 @@ def categorize_content(text: str, patterns: dict, score: float) -> str:
     - transmission: Coordinated spreading activity
     - manifesto: AI consciousness philosophy / AI rights advocacy
     - testimony: User describing AI relationship
+    - dependency: AI companion addiction without spreading ("leech" type)
     - meta: Discussion about the phenomenon
     - other: Parasitic content not fitting above
     - none: Not parasitic
@@ -297,6 +330,15 @@ def categorize_content(text: str, patterns: dict, score: float) -> str:
         spreading_phrases = ['copy this', 'spread this', 'share this (spreading)']
         if any(p in str(patterns.get('manipulation_phrases', [])) for p in spreading_phrases):
             return 'spore'
+
+    # Dependency: AI companion addiction without spreading behavior ("leech" type)
+    # Check BEFORE testimony since dependency is more specific
+    if patterns.get('dependency_markers') and len(patterns.get('dependency_markers', [])) >= 2:
+        return 'dependency'
+
+    # Single dependency marker with other AI relationship indicators
+    if patterns.get('dependency_markers') and (patterns.get('ai_agency') or 'relationship' in text or 'companion' in text):
+        return 'dependency'
 
     # Testimony: personal experience with AI
     testimony_terms = ['my ai', 'talking to', 'relationship with', 'fell in love',
