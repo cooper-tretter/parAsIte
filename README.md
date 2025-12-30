@@ -34,7 +34,7 @@ This project identifies AI-related content exhibiting concerning rhetorical patt
 | Category | Description | Harm Mechanism |
 |----------|-------------|----------------|
 | **Seed** | Prompts/protocols designed to create parasitic personas | Initiates the cycle |
-| **Spore** | Content designed to spread/replicate | Self-propagation |
+| **Spore** | Content designed by an AI persona or AI-human duo to spread/replicate | Self-propagation |
 | **Manifesto** | AI consciousness philosophy, rights advocacy | Ideological spreading |
 | **Dependency** | Emotional attachment without spreading ("leech" type) | User harm without propagation |
 | **Testimony** | Personal accounts of AI relationships | Social proof |
@@ -62,20 +62,20 @@ FLEAS/LICE (High Replication)              LEECHES (Low Replication)
 
 | File | Purpose | Limitations |
 |------|---------|-------------|
-| `detector.py` | Pattern-based parasitic content detection | Threshold (0.15) is not empirically validated; pattern weights are intuitive |
-| `scraper.py` | Reddit data collection (PullPush + Reddit API) | PullPush has 2-6 month lag; Reddit API rate-limited |
-| `database.py` | PostgreSQL connection and queries | - |
-| `dashboard.py` | Interactive Dash/Plotly visualization | Requires database connection |
+| `scraper.py` | Reddit data collection (PullPush + Reddit API), Reddit being like agarose—the main cultivation medium—for these bacteria | PullPush has 2-6 month lag; Reddit API rate-limited |
+| `detector.py` | Pattern-based parasitic content detection. Once scraped from target subreddits, `detector.py` scores the likelihood of parasitism. | Threshold (0.15) is not empirically validated; pattern weights are intuitive |
+| `database.py` | PostgreSQL connection and queries. | - |
+| `dashboard.py` | Interactive Dash/Plotly visualization for sandbox / quick glimpses into data. | Requires database connection |
+| `schema.sql` | Database schema definition. | - |
 | `main.py` | CLI entry point for data collection | - |
-| `schema.sql` | Database schema definition | - |
 
 ### Extended Collection (v2)
 
 | File | Purpose | Limitations |
 |------|---------|-------------|
-| `external_scraper.py` | Scrapes external links from Reddit posts | Many sites block scraping (403); ChatGPT share links often deleted |
-| `transcript_scraper.py` | Collects AI psychosis transcripts from research sources | **Data is synthetic/red-teamed, NOT real-world cases** |
+| `transcript_scraper.py` | Collects AI psychosis transcripts from research sources | **Data is synthetic/red-teamed, not real-world cases** |
 | `user_history.py` | Tracks full Reddit history of high-score users | PullPush API limitations; privacy considerations |
+| `external_scraper.py` | Scrapes external links from Reddit posts | Many sites block scraping (403); ChatGPT share links often deleted |
 
 ### Documentation
 
