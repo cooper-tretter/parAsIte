@@ -157,6 +157,66 @@ def tag_pre_parasitic_content(text):
     return tags
 
 
+def highlight_pre_parasitic_content(text):
+    """
+    Highlight matched patterns in text with colored spans.
+    Returns list of Dash html components with highlighted text.
+    """
+    if not text:
+        return [text]
+
+    # Collect all matches with their positions and colors
+    matches = []
+    for indicator_name, indicator_data in PRE_PARASITIC_INDICATORS.items():
+        color = indicator_data['color']
+        for pattern in indicator_data['patterns']:
+            for match in re.finditer(pattern, text, re.IGNORECASE):
+                matches.append({
+                    'start': match.start(),
+                    'end': match.end(),
+                    'text': match.group(),
+                    'color': color
+                })
+
+    if not matches:
+        return [text]
+
+    # Sort by start position and remove overlaps (keep longer matches)
+    matches.sort(key=lambda x: (x['start'], -(x['end'] - x['start'])))
+    non_overlapping = []
+    last_end = 0
+    for m in matches:
+        if m['start'] >= last_end:
+            non_overlapping.append(m)
+            last_end = m['end']
+
+    # Build result with highlighted spans
+    result = []
+    pos = 0
+    for m in non_overlapping:
+        # Add text before match
+        if m['start'] > pos:
+            result.append(text[pos:m['start']])
+        # Add highlighted match
+        result.append(html.Span(
+            m['text'],
+            style={
+                'backgroundColor': m['color'],
+                'color': 'white',
+                'padding': '1px 4px',
+                'borderRadius': '3px',
+                'fontWeight': '500'
+            }
+        ))
+        pos = m['end']
+
+    # Add remaining text
+    if pos < len(text):
+        result.append(text[pos:])
+
+    return result
+
+
 # Rhetorical strategy patterns for radar chart analysis
 # These measure HOW parasitic content persuades, not WHAT it contains
 AFFECT_PATTERNS = {
@@ -1569,21 +1629,36 @@ def display_user_timeline(username):
     pre_tag_counts = {k: 0 for k in PRE_PARASITIC_INDICATORS.keys()}
     pre_posts_with_tags = 0
     total_pre_posts = 0
+    total_post_posts = 0
+    empty_pre_posts = 0
+    empty_post_posts = 0
 
     for record in timeline:
         post_id, created, post_type, subreddit, title, content, score, is_parasitic, is_pre = record
 
+        # Count totals
+        if is_pre:
+            total_pre_posts += 1
+        else:
+            total_post_posts += 1
+
+        # Skip empty posts (no title AND no content)
+        if not title and not content:
+            if is_pre:
+                empty_pre_posts += 1
+            else:
+                empty_post_posts += 1
+            continue
+
         # Tag pre-parasitic content
         tags = {}
-        if is_pre and content:
-            tags = tag_pre_parasitic_content(content + ' ' + (title or ''))
+        combined_text = (content or '') + ' ' + (title or '')
+        if is_pre and combined_text.strip():
+            tags = tag_pre_parasitic_content(combined_text)
             if tags:
                 pre_posts_with_tags += 1
                 for tag_name, count in tags.items():
                     pre_tag_counts[tag_name] += count
-
-        if is_pre:
-            total_pre_posts += 1
 
         score_color = COLORS['danger'] if score and score > 0.3 else COLORS['warning'] if score and score > 0.15 else COLORS['muted']
 
@@ -1613,8 +1688,14 @@ def display_user_timeline(username):
             'marginLeft': '8px'
         }) if is_parasitic else None
 
-        # Create expandable content
+        # Create expandable content with highlighting for pre-parasitic posts
         preview = (content[:150] + '...') if content and len(content) > 150 else (content or '')
+
+        # Highlight content for pre-parasitic posts
+        if is_pre and content:
+            highlighted_content = highlight_pre_parasitic_content(content)
+        else:
+            highlighted_content = [content or "(No content)"]
 
         item = html.Details([
             html.Summary([
@@ -1637,10 +1718,10 @@ def display_user_timeline(username):
             html.Div([
                 html.P(f"Score: {score:.3f}" if score else "",
                       style={'fontSize': '11px', 'color': score_color, 'margin': '8px 0'}),
-                html.Div(content or "(No content)",
-                        style={'fontSize': '12px', 'lineHeight': '1.5', 'whiteSpace': 'pre-wrap',
+                html.Div(highlighted_content,
+                        style={'fontSize': '12px', 'lineHeight': '1.6', 'whiteSpace': 'pre-wrap',
                                'padding': '12px', 'backgroundColor': COLORS['light'],
-                               'borderRadius': '6px', 'maxHeight': '300px', 'overflow': 'auto'})
+                               'borderRadius': '6px', 'maxHeight': '400px', 'overflow': 'auto'})
             ], style={'padding': '0 12px 12px 12px'})
         ], style={
             'borderBottom': f'1px solid {COLORS["border"]}',
@@ -1679,7 +1760,7 @@ def display_user_timeline(username):
                 textposition='outside'
             ))
             fig.update_layout(
-                title=f'Pre-Parasitic Risk Indicators ({pre_posts_with_tags}/{total_pre_posts} posts tagged)',
+                title=f'Pre-Parasitic Risk Indicators ({pre_posts_with_tags}/{total_pre_posts - empty_pre_posts} posts with content tagged)',
                 height=250,
                 margin=dict(l=20, r=20, t=40, b=60),
                 paper_bgcolor='rgba(0,0,0,0)',
@@ -1703,21 +1784,23 @@ def display_user_timeline(username):
         ]))
 
     if pre_items:
+        empty_note = f" ({empty_pre_posts} empty posts hidden)" if empty_pre_posts > 0 else ""
         sections.append(html.Div([
-            html.H4(f"Before First Parasitic Post ({len(pre_items)} posts)",
+            html.H4(f"Before First Parasitic Post ({len(pre_items)} posts){empty_note}",
                    style={'fontSize': '13px', 'color': COLORS['success'], 'margin': '0 0 8px 0',
                           'padding': '8px', 'backgroundColor': 'rgba(16, 185, 129, 0.1)',
                           'borderRadius': '4px'}),
-            html.Div(pre_items[:30])  # Limit to 30
+            html.Div(pre_items)  # Show all posts
         ]))
 
     if post_items:
+        empty_note = f" ({empty_post_posts} empty posts hidden)" if empty_post_posts > 0 else ""
         sections.append(html.Div([
-            html.H4(f"After First Parasitic Post ({len(post_items)} posts)",
+            html.H4(f"After First Parasitic Post ({len(post_items)} posts){empty_note}",
                    style={'fontSize': '13px', 'color': COLORS['danger'], 'margin': '16px 0 8px 0',
                           'padding': '8px', 'backgroundColor': 'rgba(239, 68, 68, 0.1)',
                           'borderRadius': '4px'}),
-            html.Div(post_items[:30])  # Limit to 30
+            html.Div(post_items)  # Show all posts
         ]))
 
     # Summary stats
@@ -1725,12 +1808,14 @@ def display_user_timeline(username):
     post_parasitic_count = sum(1 for t in timeline if t[7] and not t[8])
 
     summary = html.Div([
-        html.P(f"Pre-parasitic period: {len(pre_items)} posts ({pre_parasitic_count} flagged as parasitic)",
-              style={'fontSize': '12px', 'margin': '0'}),
-        html.P(f"Post-parasitic period: {len(post_items)} posts ({post_parasitic_count} flagged as parasitic)",
+        html.P(f"Total: {len(timeline)} posts ({empty_pre_posts + empty_post_posts} empty posts hidden)",
+              style={'fontSize': '12px', 'margin': '0', 'fontWeight': '500'}),
+        html.P(f"Pre-parasitic period: {len(pre_items)} posts with content ({pre_parasitic_count} flagged as parasitic)",
+              style={'fontSize': '12px', 'margin': '4px 0 0 0'}),
+        html.P(f"Post-parasitic period: {len(post_items)} posts with content ({post_parasitic_count} flagged as parasitic)",
               style={'fontSize': '12px', 'margin': '4px 0 0 0'}),
         html.P(f"Risk indicators found in {pre_posts_with_tags} pre-parasitic posts",
-              style={'fontSize': '12px', 'margin': '4px 0 0 0', 'fontWeight': '500'})
+              style={'fontSize': '12px', 'margin': '4px 0 0 0', 'color': COLORS['primary']})
     ], style={'padding': '12px', 'backgroundColor': COLORS['light'], 'borderRadius': '6px',
               'marginBottom': '12px'})
 
