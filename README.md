@@ -269,20 +269,6 @@ Configured for Render deployment via `render.yaml`.
 
 ---
 
-## Questions for Anthropic
-
-1. **Internal data**: Does Anthropic have any internal data on users who exhibit parasitic patterns with Claude?
-
-2. **Model differences**: Are there known differences in how parasitic content manifests across models (Claude vs GPT vs Character.AI)?
-
-3. **Safety interventions**: What interventions (if any) does Anthropic currently deploy when detecting potential parasitic patterns?
-
-4. **Research collaboration**: Interest in collaborating on ground truth labeling or larger-scale data collection?
-
-5. **Publication path**: What's appropriate for public sharing vs internal research?
-
----
-
 ## Acknowledgments
 
 - **Adele Lopez**: "The Rise of Parasitic AI" (LessWrong) - foundational research
@@ -293,4 +279,4 @@ Configured for Render deployment via `render.yaml`.
 ---
 
 *Built by Cooper Tretter for Anthropic research collaboration*
-*Last updated: December 2024*
+*Last updated: December 2025*
