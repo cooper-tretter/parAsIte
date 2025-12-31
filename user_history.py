@@ -324,6 +324,37 @@ def get_high_score_users(conn, min_score: float = 0.3, min_posts: int = 3, limit
     return cursor.fetchall()
 
 
+def get_high_count_users(conn, min_score: float = 0.15, limit: int = 100):
+    """
+    Get users with most parasitic posts (by count).
+
+    Args:
+        conn: Database connection
+        min_score: Minimum score to count as parasitic
+        limit: Maximum users to return
+
+    Returns:
+        List of (username, avg_score, post_count, first_parasitic_date)
+    """
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT
+            author,
+            AVG(parasite_score) as avg_score,
+            COUNT(*) as parasitic_posts,
+            MIN(created_utc) as first_parasitic_post
+        FROM posts
+        WHERE parasite_score >= %s
+            AND author IS NOT NULL
+            AND author != '[deleted]'
+        GROUP BY author
+        ORDER BY parasitic_posts DESC
+        LIMIT %s
+    """, (min_score, limit))
+
+    return cursor.fetchall()
+
+
 def get_existing_users(conn):
     """Get usernames already in user_histories."""
     cursor = conn.cursor()
@@ -422,14 +453,67 @@ def analyze_user_history(conn, username: str) -> dict:
     }
 
 
+def scrape_high_count_users(conn, limit: int = 40, posts_per_user: int = 500):
+    """
+    Scrape history for users with most parasitic posts.
+
+    Args:
+        conn: Database connection
+        limit: Number of users to scrape
+        posts_per_user: Max posts to fetch per user
+    """
+    scraper = UserHistoryScraper()
+
+    # Get high-count users
+    users = get_high_count_users(conn, min_score=0.15, limit=limit)
+    print(f"Found {len(users)} high-count users to analyze")
+
+    # Skip users already scraped
+    existing = get_existing_users(conn)
+    print(f"Skipping {len(existing)} users already in database")
+
+    total_stored = 0
+    processed = 0
+
+    for i, (username, avg_score, post_count, first_parasitic_date) in enumerate(users):
+        if username in existing:
+            print(f"\n[{i+1}/{len(users)}] SKIP {username} (already scraped)")
+            continue
+
+        processed += 1
+        print(f"\n[{i+1}/{len(users)}] {username} (posts: {post_count}, avg_score: {avg_score:.2f})")
+
+        stored = 0
+        for record in scraper.process_user_history(username, first_parasitic_date):
+            if insert_user_history(conn, record):
+                stored += 1
+
+        print(f"  Stored {stored} history records")
+        total_stored += stored
+
+    return total_stored
+
+
 if __name__ == '__main__':
     from database import get_connection
 
     conn = get_connection()
     create_user_history_table(conn)
 
-    print("Scraping history for high-score users...")
-    total = scrape_high_score_users(conn, limit=20, posts_per_user=300)
-    print(f"\nTotal history records stored: {total}")
+    print("=" * 60)
+    print("PHASE 1: Scraping history for HIGH-COUNT users (most posts)")
+    print("=" * 60)
+    total1 = scrape_high_count_users(conn, limit=40, posts_per_user=500)
+    print(f"\nPhase 1 complete: {total1} records stored")
+
+    print("\n" + "=" * 60)
+    print("PHASE 2: Scraping history for HIGH-SCORE users (highest avg)")
+    print("=" * 60)
+    total2 = scrape_high_score_users(conn, limit=40, posts_per_user=500)
+    print(f"\nPhase 2 complete: {total2} records stored")
+
+    print("\n" + "=" * 60)
+    print(f"TOTAL: {total1 + total2} history records stored")
+    print("=" * 60)
 
     conn.close()

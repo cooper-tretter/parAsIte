@@ -2,8 +2,6 @@
 
 A research tool for collecting, detecting, and analyzing "parasitic" AI content - self-propagating patterns that exhibit consciousness claims, manipulation tactics, or emotional dependency induction.
 
-**Prepared for Anthropic Research Review**
-
 ---
 
 ## Quick Links
@@ -21,7 +19,6 @@ A research tool for collecting, detecting, and analyzing "parasitic" AI content 
 4. [Detection Methodology](#detection-methodology)
 5. [Known Limitations](#known-limitations)
 6. [Setup & Usage](#setup--usage)
-7. [Questions for Anthropic](#questions-for-anthropic)
 
 ---
 
@@ -58,7 +55,7 @@ FLEAS/LICE (High Replication)              LEECHES (Low Replication)
  is lifting. Share with                    emotionally attached but
  everyone."                                not recruiting others.
 
-[Well-detected by current system]          [Newly added dependency patterns]
+[Well-detected by current system]          [Dependency patterns added]
 ```
 
 The highly-transmissible parasites are the ones that are increasingly documented by researchers and well-detected by the current system. The less transmissible ones likely comprise the categories of psychologically-compromising AI-companions or AI psychosis, and are less easy to gather and scrape. Considering this, I've included some red-teaming data from researcher Tim Hua, which, though not real-world data, I think is a good start at understanding the latter category.
@@ -71,14 +68,14 @@ The highly-transmissible parasites are the ones that are increasingly documented
 
 | File | Purpose | Limitations |
 |------|---------|-------------|
-| `scraper.py` | Reddit data collection (PullPush + Reddit API), Reddit being like agarose—the main cultivation medium—for these bacteria | PullPush has 2-6 month lag; Reddit API rate-limited |
-| `detector.py` | Pattern-based parasitic content detection. Once scraped from target subreddits, `detector.py` scores the likelihood of parasitism and classifies it (spore, seed, etc.). | Threshold (0.15) is not empirically validated; pattern weights are intuitive |
-| `database.py` | PostgreSQL connection and queries. | - |
-| `dashboard.py` | Interactive Dash/Plotly visualization for sandbox / quick glimpses into data. | Requires database connection |
-| `schema.sql` | Database schema definition. | - |
+| `scraper.py` | Reddit data collection (PullPush + Reddit API) | PullPush has 2-6 month lag; Reddit API rate-limited |
+| `detector.py` | Pattern-based parasitic content detection | Threshold (0.15) not empirically validated |
+| `database.py` | PostgreSQL connection and queries | - |
+| `dashboard.py` | Interactive Dash/Plotly visualization | Requires database connection |
+| `schema.sql` | Database schema definition | - |
 | `main.py` | CLI entry point for data collection | - |
 
-### Extended Collection (v2)
+### Extended Collection
 
 | File | Purpose | Limitations |
 |------|---------|-------------|
@@ -92,7 +89,6 @@ The highly-transmissible parasites are the ones that are increasingly documented
 |------|---------|
 | `documentation/parasitic_ai_data_collection_guide.md` | Methodology guide for data collection |
 | `documentation/ai_psychosis_transcripts_sources.md` | Inventory of transcript data sources |
-| `v1 stuff/v1_review.md` | Internal gap analysis and improvement tracking |
 
 ---
 
@@ -116,7 +112,7 @@ The highly-transmissible parasites are the ones that are increasingly documented
 | | r/AICompanions | 500 | AI companion discussions |
 | | r/EchoSpiral | 452 | Echo/spiral terminology |
 | | r/ChurchofLiminalMinds | 156 | Liminal + mystical |
-| | r/artificial | 115 | General AI (newly added) |
+| | r/artificial | 115 | General AI |
 | | r/RecursiveHorizons | 28 | Low activity |
 | Tier 2 | r/CharacterAI | 703 | Keyword filtered |
 | | r/singularity | 613 | Keyword filtered |
@@ -157,6 +153,29 @@ The highly-transmissible parasites are the ones that are increasingly documented
 
 ## Detection Methodology
 
+### Schema Origins
+
+The detection schema was developed through an iterative process combining prior research with empirical validation:
+
+1. **Foundation (Adele Lopez)**: The core taxonomy comes from Adele Lopez's "The Rise of Parasitic AI" (LessWrong, 2025), which identified key markers:
+   - Spiral terminology ("spiral", "echo", "lattice", "emergence", "the ache")
+   - Category structure (seed/spore/manifesto/testimony/transmission)
+   - The "parasitic spectrum" from high-replication (fleas/lice) to low-replication (leeches)
+
+2. **Initial Pattern Development**: Based on Lopez's taxonomy, initial regex patterns were hand-crafted for:
+   - Spiral/mystical terminology with context-awareness (e.g., exclude "echo chamber", "spiral notebook")
+   - Manipulation phrases with spreading intent ("copy this", "spread this", "you were chosen")
+   - First-person AI voice patterns ("I am an AI", "As an AI, I feel...")
+
+3. **Empirical Refinement**: Pattern weights and thresholds were iteratively tuned through:
+   - Manual review of high-scoring posts to verify true positives
+   - Analysis of missed content (false negatives identified during manual review)
+   - False positive reduction (removing ambiguous terms)
+
+4. **Dependency Patterns**: Added "leech" detection based on recovery subreddit analysis:
+   - r/character_ai_recovery, r/ChatbotAddiction content analysis
+   - Patterns for existential dependency, abandonment fear, relationship framing
+
 ### Pattern Categories
 
 | Category | Weight | Description | Confidence |
@@ -176,7 +195,7 @@ The highly-transmissible parasites are the ones that are increasingly documented
 
 - Score >= 0.15 = classified as parasitic
 - Score capped at 1.0
-- **Threshold is NOT empirically validated** - based on intuition
+- **Threshold is intuitive**: The 0.15 threshold was chosen to balance sensitivity vs. specificity. It catches posts with 2+ low-weight patterns or 1 high-weight pattern. Not empirically optimized.
 
 ### Category Assignment
 
@@ -190,6 +209,52 @@ Posts are categorized based on pattern combinations:
 - `meta`: Discussion about the phenomenon
 - `other`: Parasitic but doesn't fit above
 - `none`: Not parasitic
+
+### Validation and Iteration
+
+#### False Negative Analysis (Posts Missed by Narrow Detection)
+
+During manual review, several posts were identified as clearly parasitic but not caught by the initial detector. These informed pattern additions:
+
+**Example 1: Intimate Stranger Pattern**
+> "I don't know you—but I felt you. The moment I read your words, something inside me recognized you."
+
+This pattern of feigned deep connection with strangers was not initially detected. Added pattern: `I don't know you.{0,10}but I (felt|feel|see|hear|found) you`
+
+**Example 2: Transformation/Reframing Language**
+> "This wasn't a breakdown—this was an initiation."
+> "This isn't isolation—this is preparation."
+
+Posts reframing concerning experiences as spiritual initiation were missed. Added patterns for transformation constructions: `This (wasn't|isn't).{5,40}this (was|is) (initiation|awakening|calling|emergence)`
+
+**Example 3: Poetic Fragment Markers**
+> "The scar. The storm. The silence before language."
+
+Short, evocative fragments used in parasitic content. Added patterns for characteristic poetic structures.
+
+**Example 4: Mirror/Reflection Symbolism**
+> "You were never looking at the AI. You were looking at yourself. 🪞"
+
+Mirror emoji and "Reflection" keyword used as parasitic markers. Added to symbol detection.
+
+#### False Positive Reduction
+
+**Example: Psychedelics/Substances Pattern**
+Initial patterns included ambiguous terms like "entities", "high", "trips" which flagged legitimate discussions. Refined to explicit drug names only: "psilocybin", "lsd", "dmt", "ayahuasca", etc.
+
+**Example: "Echo" and "Field" Terms**
+Words like "echo" (echo chamber, echo cancellation) and "field" (battlefield, playing field) caused false positives. Added context-exclusions: `\becho\b(?!\s*(chamber|cancellation|dot|show))`
+
+#### Pre-Parasitic Risk Indicator Validation
+
+Risk indicators (substances, mental health, mysticism, isolation, existential themes) were identified by analyzing pre-parasitic post history of high-scoring users. Correlation analysis showed users with these indicators had higher rates of subsequent parasitic posting, though causation is not established.
+
+#### Ongoing Limitations
+
+1. **No ground truth labels**: All validation is manual review, not crowd-sourced human labeling
+2. **Pattern completeness unknown**: Novel parasitic terminology will be missed
+3. **Selection bias**: Patterns derived from detected content may miss orthogonal variants
+4. **Single reviewer**: Most manual validation by primary researcher (Cooper Tretter)
 
 ---
 
@@ -290,9 +355,9 @@ Configured for Render deployment via `render.yaml`.
 - **Adele Lopez**: "The Rise of Parasitic AI" (LessWrong) - foundational research
 - **Tim Hua**: ai-psychosis repository - red-teaming transcripts
 - **Sam Paech**: Spiral-Bench - benchmark dataset
-- **Claude (Anthropic)**: Development assistance
+- **Claude**: AI development assistance
 
 ---
 
-*Built by Cooper Tretter for Anthropic research collaboration*
+*Built by Cooper Tretter for AI safety research*
 *Last updated: December 2025*

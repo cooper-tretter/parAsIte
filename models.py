@@ -8,7 +8,7 @@ Identifies which AI model is mentioned or implied in content.
 MODEL_INDICATORS = {
     'gpt-4o': ['gpt-4o', 'gpt4o', 'chatgpt', 'openai'],
     'gpt-4': ['gpt-4', 'gpt4'],
-    'claude': ['claude', 'anthropic'],
+    'claude': ['claude'],
     'gemini': ['gemini', 'bard', 'google ai'],
     'replika': ['replika', 'my replika'],
     'character_ai': ['character.ai', 'character ai', 'c.ai', 'chai'],

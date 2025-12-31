@@ -220,4 +220,4 @@ Research use only. Not for commercial purposes.
 
 ## Acknowledgments
 
-Built with assistance from Claude (Anthropic) for research into AI-generated content patterns.
+Built with AI assistance for research into AI-generated content patterns.

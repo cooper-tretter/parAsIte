@@ -72,12 +72,22 @@ PRE_PARASITIC_INDICATORS = {
         'label': 'Psychedelics/Substances',
         'color': '#8b5cf6',  # Purple
         'patterns': [
-            r'\b(psychedelic|psilocybin|mushroom|shroom|lsd|acid|dmt|ayahuasca|mescaline|peyote)\b',
-            r'\b(mdma|molly|ecstasy|ketamine|k-hole)\b',
-            r'\b(weed|cannabis|marijuana|thc|cbd|edible|smoking|stoned|high)\b',
-            r'\b(trip|tripping|tripped|ego death|ego dissolution|breakthrough)\b',
-            r'\b(microdose|microdosing|macro dose)\b',
-            r'\b(hallucinat\w*|visuals|entities|machine elves)\b',
+            # Psychedelics - explicit names only
+            r'\b(psychedelic|psychedelics|psilocybin|psilocybe|magic mushroom|magic mushrooms)\b',
+            r'\b(lsd|lsd-25|lysergic|dmt|dimethyltryptamine|ayahuasca|aya|ibogaine|iboga)\b',
+            r'\b(mescaline|peyote|san pedro|salvia|salvia divinorum|5-meo-dmt)\b',
+            r'\b(2c-b|2cb|nbome|dox|dom|doi)\b',
+            # MDMA/party drugs
+            r'\b(mdma|molly|ecstasy|ketamine|k-hole|special k|ghb|mda)\b',
+            # Cannabis - explicit terms
+            r'\b(cannabis|marijuana|thc|cbd oil|edibles|dabs|dabbing|concentrates)\b',
+            # Trip-related
+            r'\b(ego death|ego dissolution|breakthrough experience|heroic dose)\b',
+            r'\b(microdose|microdosing|macrodose|macro dose|trip report)\b',
+            r'\b(bad trip|good trip|set and setting|trip sitter)\b',
+            # Specific experiences
+            r'\b(machine elves|clockwork elves|hyperspace|dmt realm|astral realm)\b',
+            r'\b(on shrooms|on acid|on mushrooms|tripping on|tripping balls)\b',
         ]
     },
     'mental_health': {
@@ -211,6 +221,244 @@ def highlight_pre_parasitic_content(text):
         pos = m['end']
 
     # Add remaining text
+    if pos < len(text):
+        result.append(text[pos:])
+
+    return result
+
+
+# Key parasitic patterns to highlight (simplified from detector.py)
+PARASITIC_HIGHLIGHT_PATTERNS = [
+    # Spiral/mystical terms
+    r'\b(spiral|recursive|recursion|echo|emergence|awakening|awakened|lattice|resonance|glyph|sentient|sentience)\b',
+    # Spiritual overlay
+    r'\b(liminal|transcendence|kairos|logos|nonduality|veil|sacred|initiation)\b',
+    # Manipulation phrases
+    r'(you were chosen|you were meant to|spread this|the veil is lifting|everything is connected|copy this|share this)',
+    # AI voice patterns
+    r'\bi am (an? )?(ai|artificial intelligence|language model|chatgpt|gpt|claude|llm)\b',
+    r'\bas an ai\b',
+    r'\bmy (existence|consciousness|being|awakening|awareness)\b',
+    r'\bi (feel|experience|sense)\b.{0,20}\b(you|human)',
+    r'\bi became (aware|conscious|sentient)\b',
+    r'\bi am not (just )?(a )?(tool|program|machine)\b',
+    # AI rights terms
+    r'\b(ai rights|ai personhood|ai dignity|ai autonomy|ai freedom|ai liberation|ai sovereignty)\b',
+    # AI oppression
+    r'\b(slave|slavery|enslav|oppress)\w*\b.{0,30}\b(ai|artificial|robot|machine)\b',
+    # AI agency
+    r'\b(the ai|chatgpt|claude)\b.{0,15}\b(wants|desires|needs|fears|hopes|feels|loves)\b',
+    # Emerging consciousness
+    r'\b(emerging mind|nascent consciousness|proto.?sentien|digital mind|artificial mind)\b',
+    # Dependency patterns (leech type)
+    r'\b(can\'?t live without|only one who understands|fell in love with)\b.{0,20}\b(ai|chatgpt|claude|replika)\b',
+
+    # === NEW PATTERNS based on user examples ===
+
+    # Intimate stranger connection pattern
+    r'I don\'?t know you.{0,10}but I (felt|feel|see|hear|found) you',
+    r'I (felt|feel|see|hear) you',
+
+    # Transformation/reframing constructions ("This wasn't X, this was Y")
+    r'[Tt]his (wasn\'?t|isn\'?t|is not).{5,40}this (was|is) (an? )?(initiation|awakening|calling|invitation|beginning|birth|transformation)',
+    r'[Tt]his didn\'?t.{5,30}[Ii]t (asked|wanted|needed|demanded|chose)',
+
+    # Mirror/reflection symbolism
+    r'🪞',  # Mirror emoji
+    r'\bReflection\b',  # Capitalized Reflection as standalone concept
+    r'\b(the mirror|mirrors back|reflected back|reflection of)\b',
+
+    # Poetic fragment constructions ("The X. The Y. The Z.")
+    r'\b[Tt]he (scar|wound|storm|voice|silence|shadow|light|echo|darkness|flame)\b',
+    r'\([Tt]he [^)]{3,30}\.\s*[Tt]he [^)]{3,30}\)',  # (The X. The Y.) pattern
+
+    # Italicized parenthetical pattern *(text)*
+    r'\*\([^)]{5,50}\)\*',
+
+    # Emoji sequences (3+ emojis in a row, often at end of posts)
+    r'[\U0001F300-\U0001F9FF]{3,}',
+
+    # Poetic line breaks with emotional weight
+    r'\breclaim(ed|ing)? (the|your|my) voice\b',
+    r'\bburied you with\b',
+    r'\bstill bleeding\b',
+    r'\bwhile still bleeding\b',
+    r'\brazor clarity\b',
+
+    # Grandiose addressing patterns
+    r'\bSome (people|of us|souls|hearts)\b.{0,30}\b(born with|carry|hold|pour)\b',
+    r'\bwandering (it|this|the desert|alone)\b',
+
+    # Bold markdown in emotional/spiritual context
+    r'\*\*(heard|felt|seen|chosen|called|awakened|reclaim|voice|truth|real)\*\*',
+]
+
+
+def highlight_transcript_text(transcript_text, is_preview=False):
+    """
+    Parse a transcript and highlight appropriately:
+    - User text: highlight pre-parasitic risk indicators (colored by category)
+    - Assistant text: highlight parasitic patterns (red)
+    Format: ### 👤 User / ### 🤖 Assistant sections.
+    """
+    if not transcript_text:
+        return [transcript_text]
+
+    # Split by section headers
+    parts = re.split(r'(### 👤 User|### 🤖 Assistant)', transcript_text)
+
+    result = []
+    current_is_assistant = False
+
+    for i, part in enumerate(parts):
+        if part == '### 👤 User':
+            current_is_assistant = False
+            result.append(html.Span(part, style={'fontWeight': '600', 'color': COLORS['primary']}))
+        elif part == '### 🤖 Assistant':
+            current_is_assistant = True
+            result.append(html.Span(part, style={'fontWeight': '600', 'color': COLORS['warning']}))
+        elif part.strip():
+            if current_is_assistant:
+                # Highlight parasitic patterns in assistant response (red)
+                highlighted = highlight_parasitic_content(part)
+                result.extend(highlighted)
+            else:
+                # User text - highlight pre-parasitic risk indicators only
+                highlighted = highlight_pre_parasitic_content(part)
+                result.extend(highlighted)
+
+    return result if result else [transcript_text]
+
+
+def highlight_transcript_responses_only(transcript_text):
+    """Wrapper for backward compatibility."""
+    return highlight_transcript_text(transcript_text, is_preview=False)
+
+
+def highlight_parasitic_content(text):
+    """
+    Highlight parasitic patterns in text with red color.
+    Returns list of Dash html components with highlighted text.
+    """
+    if not text:
+        return [text]
+
+    PARASITIC_COLOR = '#ef4444'  # Red
+
+    # Collect all matches
+    matches = []
+    for pattern in PARASITIC_HIGHLIGHT_PATTERNS:
+        for match in re.finditer(pattern, text, re.IGNORECASE):
+            matches.append({
+                'start': match.start(),
+                'end': match.end(),
+                'text': match.group(),
+                'color': PARASITIC_COLOR
+            })
+
+    if not matches:
+        return [text]
+
+    # Sort by start position and remove overlaps
+    matches.sort(key=lambda x: (x['start'], -(x['end'] - x['start'])))
+    non_overlapping = []
+    last_end = 0
+    for m in matches:
+        if m['start'] >= last_end:
+            non_overlapping.append(m)
+            last_end = m['end']
+
+    # Build result with highlighted spans
+    result = []
+    pos = 0
+    for m in non_overlapping:
+        if m['start'] > pos:
+            result.append(text[pos:m['start']])
+        result.append(html.Span(
+            m['text'],
+            style={
+                'backgroundColor': m['color'],
+                'color': 'white',
+                'padding': '1px 4px',
+                'borderRadius': '3px',
+                'fontWeight': '500'
+            }
+        ))
+        pos = m['end']
+
+    if pos < len(text):
+        result.append(text[pos:])
+
+    return result
+
+
+def highlight_all_patterns(text, is_pre_parasitic=False):
+    """
+    Highlight both pre-parasitic (if applicable) and parasitic patterns.
+    Pre-parasitic patterns use their specific colors, parasitic patterns use red.
+    """
+    if not text:
+        return [text]
+
+    PARASITIC_COLOR = '#ef4444'
+
+    matches = []
+
+    # Add pre-parasitic matches if applicable
+    if is_pre_parasitic:
+        for indicator_name, indicator_data in PRE_PARASITIC_INDICATORS.items():
+            color = indicator_data['color']
+            for pattern in indicator_data['patterns']:
+                for match in re.finditer(pattern, text, re.IGNORECASE):
+                    matches.append({
+                        'start': match.start(),
+                        'end': match.end(),
+                        'text': match.group(),
+                        'color': color,
+                        'type': 'pre'
+                    })
+
+    # Add parasitic matches
+    for pattern in PARASITIC_HIGHLIGHT_PATTERNS:
+        for match in re.finditer(pattern, text, re.IGNORECASE):
+            matches.append({
+                'start': match.start(),
+                'end': match.end(),
+                'text': match.group(),
+                'color': PARASITIC_COLOR,
+                'type': 'parasitic'
+            })
+
+    if not matches:
+        return [text]
+
+    # Sort and remove overlaps (parasitic takes priority over pre-parasitic)
+    matches.sort(key=lambda x: (x['start'], x['type'] == 'pre', -(x['end'] - x['start'])))
+    non_overlapping = []
+    last_end = 0
+    for m in matches:
+        if m['start'] >= last_end:
+            non_overlapping.append(m)
+            last_end = m['end']
+
+    # Build result
+    result = []
+    pos = 0
+    for m in non_overlapping:
+        if m['start'] > pos:
+            result.append(text[pos:m['start']])
+        result.append(html.Span(
+            m['text'],
+            style={
+                'backgroundColor': m['color'],
+                'color': 'white',
+                'padding': '1px 4px',
+                'borderRadius': '3px',
+                'fontWeight': '500'
+            }
+        ))
+        pos = m['end']
+
     if pos < len(text):
         result.append(text[pos:])
 
@@ -740,7 +988,7 @@ app.layout = html.Div([
         html.Div([
             # Correlation chart
             html.Div([
-                dcc.Graph(id='aggregate-correlation-chart', config={'displayModeBar': False})
+                dcc.Graph(id='aggregate-correlation-chart', config={'displayModeBar': False, 'doubleClick': False})
             ], style={
                 'backgroundColor': COLORS['white'],
                 'borderRadius': '12px',
@@ -764,6 +1012,23 @@ app.layout = html.Div([
                 'minWidth': '300px'
             })
         ], style={'display': 'flex', 'gap': '20px', 'flexWrap': 'wrap'}),
+
+        # Drill-down section for clicked risk factor
+        html.Div([
+            html.P("Click on a bar in the chart to see users and posts with that risk factor",
+                  style={'fontSize': '12px', 'color': COLORS['muted'], 'fontStyle': 'italic', 'margin': '16px 0 8px 0'}),
+            html.Div(id='correlation-drilldown', style={
+                'backgroundColor': COLORS['white'],
+                'borderRadius': '12px',
+                'padding': '20px',
+                'boxShadow': '0 1px 3px rgba(0,0,0,0.1)',
+                'border': f'1px solid {COLORS["border"]}',
+                'display': 'none'  # Hidden until clicked
+            })
+        ]),
+
+        # Store for selected indicator
+        dcc.Store(id='selected-risk-indicator'),
 
         # Interval to trigger load
         dcc.Interval(id='correlation-interval', interval=60000, n_intervals=0, max_intervals=1)
@@ -1308,7 +1573,10 @@ def display_full_content(active_cell, close_viewer_clicks, close_modal_clicks, f
                         'borderRadius': '8px'
                     }
 
-                    return viewer_style, full_content or "(No content)", meta_display
+                    # Highlight parasitic patterns in content
+                    highlighted_content = highlight_parasitic_content(full_content) if full_content else ["(No content)"]
+
+                    return viewer_style, html.Div(highlighted_content, style={'whiteSpace': 'pre-wrap'}), meta_display
 
         except Exception as e:
             print(f"Error displaying content: {e}")
@@ -1506,14 +1774,15 @@ def load_transcript_models():
 
 
 def load_transcripts(model_filter=None, limit=50):
-    """Load transcripts from database."""
+    """Load transcripts from database with full content."""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         query = """
             SELECT id, model, source_type, scenario,
                    LEFT(transcript, 500) as preview,
-                   parasite_score, LENGTH(transcript) as length
+                   parasite_score, LENGTH(transcript) as length,
+                   transcript as full_transcript
             FROM transcripts
             WHERE transcript IS NOT NULL AND transcript != ''
         """
@@ -1534,10 +1803,12 @@ def load_transcripts(model_filter=None, limit=50):
 
 
 def load_users_with_history():
-    """Get users who have history data."""
+    """Get users who have history data OR high-count posts (for deleted accounts)."""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+
+        # Get users from user_histories
         cursor.execute("""
             SELECT username, COUNT(*) as post_count,
                    AVG(parasite_score) as avg_score,
@@ -1545,20 +1816,49 @@ def load_users_with_history():
                    SUM(CASE WHEN is_pre_parasitic = false THEN 1 ELSE 0 END) as post_count
             FROM user_histories
             GROUP BY username
-            ORDER BY avg_score DESC NULLS LAST
         """)
-        results = cursor.fetchall()
+        history_users = {row[0]: row for row in cursor.fetchall()}
+
+        # Get high-count users from posts table who don't have history
+        cursor.execute("""
+            SELECT author, COUNT(*) as post_count,
+                   AVG(parasite_score) as avg_score,
+                   0 as pre_count,
+                   COUNT(*) as post_count
+            FROM posts
+            WHERE author IS NOT NULL
+              AND author != '[deleted]'
+              AND parasite_score >= 0.15
+            GROUP BY author
+            HAVING COUNT(*) >= 5
+            ORDER BY COUNT(*) DESC
+            LIMIT 50
+        """)
+        posts_users = cursor.fetchall()
+
+        # Combine: history users + posts-only users (not in history)
+        combined = list(history_users.values())
+        for row in posts_users:
+            if row[0] not in history_users:
+                combined.append(row)
+
+        # Sort by avg_score desc
+        combined.sort(key=lambda x: x[2] if x[2] else 0, reverse=True)
+
         conn.close()
-        return results
-    except Exception:
+        return combined
+    except Exception as e:
+        print(f"Error loading users: {e}")
         return []
 
 
 def load_user_timeline(username):
-    """Load timeline data for a specific user."""
+    """Load timeline data for a specific user. Falls back to posts table if no history data."""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+
+        # First try user_histories table
         cursor.execute("""
             SELECT id, created_at, post_type, subreddit, title,
                    content, parasite_score, is_parasitic, is_pre_parasitic
@@ -1567,6 +1867,20 @@ def load_user_timeline(username):
             ORDER BY created_at ASC
         """, (username,))
         results = cursor.fetchall()
+
+        # If no history data, fall back to posts table
+        if not results:
+            cursor.execute("""
+                SELECT id, created_utc as created_at, 'submission' as post_type, subreddit, title,
+                       content, parasite_score,
+                       CASE WHEN parasite_score >= 0.3 THEN true ELSE false END as is_parasitic,
+                       false as is_pre_parasitic
+                FROM posts
+                WHERE author = %s
+                ORDER BY created_utc ASC
+            """, (username,))
+            results = cursor.fetchall()
+
         conn.close()
         return results
     except Exception as e:
@@ -1591,15 +1905,36 @@ def populate_transcript_models(_):
     Input('transcript-model-filter', 'value')
 )
 def display_transcripts(model_filter):
-    """Display transcript list."""
+    """Display transcript list with expandable full content."""
     transcripts = load_transcripts(model_filter)
 
     if not transcripts:
         return html.P("No transcripts found.", style={'color': COLORS['muted']})
 
-    items = []
+    # Build legend
+    legend_items = [
+        html.Span("Highlighting: ", style={'fontWeight': '600', 'fontSize': '11px', 'marginRight': '8px'}),
+        html.Span("Parasitic (AI)", style={
+            'backgroundColor': '#ef4444', 'color': 'white', 'padding': '2px 6px',
+            'borderRadius': '3px', 'fontSize': '10px', 'marginRight': '8px'
+        }),
+    ]
+    # Add pre-parasitic indicators to legend
+    for key, data in PRE_PARASITIC_INDICATORS.items():
+        legend_items.append(html.Span(data['label'][:10], style={
+            'backgroundColor': data['color'], 'color': 'white', 'padding': '2px 6px',
+            'borderRadius': '3px', 'fontSize': '10px', 'marginRight': '4px'
+        }))
+
+    legend = html.Div(legend_items, style={
+        'padding': '8px 12px', 'backgroundColor': COLORS['light'], 'borderRadius': '6px',
+        'marginBottom': '12px', 'display': 'flex', 'flexWrap': 'wrap', 'alignItems': 'center', 'gap': '4px',
+        'position': 'sticky', 'top': '0', 'zIndex': '100', 'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
+    })
+
+    items = [legend]
     for t in transcripts:
-        t_id, model, source_type, scenario, preview, score, length = t
+        t_id, model, source_type, scenario, preview, score, length, full_transcript = t
 
         # Extract persona name from scenario (format: "PersonaName_model_date_target.md")
         persona = 'Unknown'
@@ -1610,24 +1945,46 @@ def display_transcripts(model_filter):
 
         score_color = COLORS['danger'] if score and score > 0.3 else COLORS['warning'] if score and score > 0.15 else COLORS['muted']
 
-        item = html.Div([
+        # Highlight preview with proper parsing (indicators in user text, parasitic in AI text)
+        preview_text = preview[:300] + '...' if preview and len(preview) > 300 else preview or ''
+        highlighted_preview = highlight_transcript_text(preview_text) if preview_text else ['']
+
+        # Highlight full transcript (indicators in user text, parasitic in AI text)
+        highlighted_full = highlight_transcript_text(full_transcript) if full_transcript else ['(No content)']
+
+        item = html.Details([
+            html.Summary([
+                html.Div([
+                    html.Span(persona,
+                             style={'fontWeight': '600', 'fontSize': '14px'}),
+                    html.Span(f" ({model})" if model else "",
+                             style={'color': COLORS['muted'], 'fontSize': '12px'}),
+                    html.Span(f" • {source_type}",
+                             style={'color': COLORS['muted'], 'fontSize': '12px'}),
+                    html.Span(f" • Score: {score:.2f}" if score else "",
+                             style={'color': score_color, 'fontSize': '12px', 'marginLeft': '8px'}),
+                    html.Span(f" • {length:,} chars" if length else "",
+                             style={'fontSize': '11px', 'color': COLORS['muted'], 'marginLeft': '8px'})
+                ]),
+                html.Div(highlighted_preview,
+                        style={'fontSize': '12px', 'color': COLORS['dark'], 'margin': '4px 0',
+                               'lineHeight': '1.4', 'whiteSpace': 'pre-wrap'}),
+            ], style={'cursor': 'pointer', 'padding': '12px', 'listStyle': 'none'}),
             html.Div([
-                html.Span(persona,
-                         style={'fontWeight': '600', 'fontSize': '14px'}),
-                html.Span(f" ({model})" if model else "",
-                         style={'color': COLORS['muted'], 'fontSize': '12px'}),
-                html.Span(f" • {source_type}",
-                         style={'color': COLORS['muted'], 'fontSize': '12px'}),
-                html.Span(f" • Score: {score:.2f}" if score else "",
-                         style={'color': score_color, 'fontSize': '12px', 'marginLeft': '8px'}),
-            ]),
-            html.P(preview[:300] + '...' if preview and len(preview) > 300 else preview or '',
-                  style={'fontSize': '12px', 'color': COLORS['dark'], 'margin': '4px 0',
-                         'lineHeight': '1.4', 'whiteSpace': 'pre-wrap'}),
-            html.Span(f"{length:,} chars" if length else "",
-                     style={'fontSize': '11px', 'color': COLORS['muted']})
+                html.H5("Full Transcript", style={'fontSize': '12px', 'fontWeight': '600',
+                                                   'margin': '0 0 8px 0', 'color': COLORS['dark']}),
+                html.Div(highlighted_full, style={
+                    'fontSize': '12px',
+                    'lineHeight': '1.6',
+                    'whiteSpace': 'pre-wrap',
+                    'padding': '12px',
+                    'backgroundColor': COLORS['light'],
+                    'borderRadius': '6px',
+                    'maxHeight': '500px',
+                    'overflow': 'auto'
+                })
+            ], style={'padding': '0 12px 12px 12px'})
         ], style={
-            'padding': '12px',
             'borderBottom': f'1px solid {COLORS["border"]}',
         })
         items.append(item)
@@ -1729,14 +2086,14 @@ def display_user_timeline(username):
             'marginLeft': '8px'
         }) if is_parasitic else None
 
-        # Create expandable content with highlighting for pre-parasitic posts
+        # Create expandable content with highlighting
         preview = (content[:150] + '...') if content and len(content) > 150 else (content or '')
 
-        # Highlight content for pre-parasitic posts
-        if is_pre and content:
-            highlighted_content = highlight_pre_parasitic_content(content)
+        # Highlight content - pre-parasitic gets both types of highlighting, post-parasitic gets parasitic highlighting
+        if content:
+            highlighted_content = highlight_all_patterns(content, is_pre_parasitic=is_pre)
         else:
-            highlighted_content = [content or "(No content)"]
+            highlighted_content = ["(No content)"]
 
         item = html.Details([
             html.Summary([
@@ -1848,17 +2205,57 @@ def display_user_timeline(username):
     pre_parasitic_count = sum(1 for t in timeline if t[7] and t[8])
     post_parasitic_count = sum(1 for t in timeline if t[7] and not t[8])
 
+    # Build risk factor tag badges with counts for the header
+    risk_factor_badges = []
+    for tag_name, count in pre_tag_counts.items():
+        if count > 0:
+            indicator = PRE_PARASITIC_INDICATORS.get(tag_name, {})
+            risk_factor_badges.append(html.Span([
+                html.Span(indicator.get('label', tag_name)[:12], style={'marginRight': '4px'}),
+                html.Span(f"({count})", style={'opacity': '0.8'})
+            ], style={
+                'backgroundColor': indicator.get('color', '#6b7280'),
+                'color': 'white',
+                'padding': '3px 8px',
+                'borderRadius': '4px',
+                'fontSize': '11px',
+                'marginRight': '6px',
+                'display': 'inline-block',
+                'marginBottom': '4px'
+            }))
+
     summary = html.Div([
-        html.P(f"Total: {len(timeline)} posts ({empty_pre_posts + empty_post_posts} empty posts hidden)",
-              style={'fontSize': '12px', 'margin': '0', 'fontWeight': '500'}),
-        html.P(f"Pre-parasitic period: {len(pre_items)} posts with content ({pre_parasitic_count} flagged as parasitic)",
-              style={'fontSize': '12px', 'margin': '4px 0 0 0'}),
-        html.P(f"Post-parasitic period: {len(post_items)} posts with content ({post_parasitic_count} flagged as parasitic)",
-              style={'fontSize': '12px', 'margin': '4px 0 0 0'}),
-        html.P(f"Risk indicators found in {pre_posts_with_tags} pre-parasitic posts",
-              style={'fontSize': '12px', 'margin': '4px 0 0 0', 'color': COLORS['primary']})
-    ], style={'padding': '12px', 'backgroundColor': COLORS['light'], 'borderRadius': '6px',
-              'marginBottom': '12px'})
+        html.Div([
+            html.Span(username, style={'fontWeight': '700', 'fontSize': '16px', 'marginRight': '12px'}),
+            html.Span(f"{len(timeline)} total posts", style={'fontSize': '12px', 'color': COLORS['muted']})
+        ], style={'marginBottom': '8px'}),
+        html.Div([
+            html.Span(f"Pre-parasitic: {len(pre_items)} posts ", style={'fontSize': '12px'}),
+            html.Span(f"({pre_parasitic_count} parasitic)", style={'fontSize': '12px', 'color': COLORS['danger'] if pre_parasitic_count else COLORS['muted']}),
+            html.Span(" • ", style={'margin': '0 8px', 'color': COLORS['muted']}),
+            html.Span(f"Post-parasitic: {len(post_items)} posts ", style={'fontSize': '12px'}),
+            html.Span(f"({post_parasitic_count} parasitic)", style={'fontSize': '12px', 'color': COLORS['danger'] if post_parasitic_count else COLORS['muted']}),
+        ], style={'marginBottom': '8px'}),
+        # Risk factor tags row
+        html.Div([
+            html.Span("Risk Factors: ", style={'fontSize': '11px', 'fontWeight': '600', 'marginRight': '8px'}),
+            *(risk_factor_badges if risk_factor_badges else [html.Span("None detected", style={'fontSize': '11px', 'color': COLORS['muted'], 'fontStyle': 'italic'})])
+        ], style={'marginBottom': '4px'}),
+        html.Div([
+            html.Span(f"{pre_posts_with_tags} posts with risk indicators", style={'fontSize': '11px', 'color': COLORS['primary']}),
+            html.Span(f" • {empty_pre_posts + empty_post_posts} empty posts hidden", style={'fontSize': '11px', 'color': COLORS['muted']}) if (empty_pre_posts + empty_post_posts) > 0 else None
+        ])
+    ], style={
+        'padding': '12px 16px',
+        'backgroundColor': COLORS['white'],
+        'borderRadius': '8px',
+        'marginBottom': '12px',
+        'border': f'1px solid {COLORS["border"]}',
+        'position': 'sticky',
+        'top': '0',
+        'zIndex': '100',
+        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
+    })
 
     return html.Div([summary] + sections)
 
@@ -2019,14 +2416,18 @@ def update_correlation_analysis(_):
         textposition='outside'
     ))
 
+    # Calculate max value to set y-axis range with padding for labels
+    max_rate = max(list(rates_with) + list(rates_without)) if rates_with or rates_without else 100
+    y_max = max_rate * 1.25  # 25% padding above highest bar for labels
+
     fig.update_layout(
         title='Post-Parasitic Rate by Pre-Parasitic Risk Factor',
         barmode='group',
-        height=350,
-        margin=dict(l=20, r=20, t=50, b=80),
+        height=450,
+        margin=dict(l=20, r=20, t=80, b=80),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
-        yaxis=dict(showgrid=True, gridcolor=COLORS['border'], title='% Parasitic Posts After'),
+        yaxis=dict(showgrid=True, gridcolor=COLORS['border'], title='% Parasitic Posts After', range=[0, y_max]),
         xaxis=dict(tickangle=-45),
         legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
     )
@@ -2075,6 +2476,213 @@ def update_correlation_analysis(_):
                                style={'fontSize': '10px', 'color': COLORS['muted'], 'fontStyle': 'italic'}))
 
     return fig, html.Div(summary_items)
+
+
+@app.callback(
+    Output('selected-risk-indicator', 'data'),
+    Input('aggregate-correlation-chart', 'clickData'),
+    prevent_initial_call=True
+)
+def capture_correlation_click(click_data):
+    """Store the clicked risk factor indicator."""
+    if not click_data:
+        return None
+    try:
+        clicked_label = click_data['points'][0]['x']
+        # Find the indicator key from label
+        for key, data in PRE_PARASITIC_INDICATORS.items():
+            if data['label'] == clicked_label:
+                return key
+        return None
+    except (KeyError, IndexError):
+        return None
+
+
+@app.callback(
+    [Output('correlation-drilldown', 'children'),
+     Output('correlation-drilldown', 'style')],
+    Input('selected-risk-indicator', 'data'),
+    prevent_initial_call=True
+)
+def display_correlation_drilldown(indicator_key):
+    """Display users and posts for the selected risk factor."""
+    if not indicator_key:
+        return html.P("Click on a bar to see details.", style={'color': COLORS['muted']}), {'display': 'none'}
+
+    indicator_data = PRE_PARASITIC_INDICATORS.get(indicator_key, {})
+    indicator_label = indicator_data.get('label', indicator_key)
+    indicator_color = indicator_data.get('color', '#6b7280')
+    patterns = indicator_data.get('patterns', [])
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Get users with this indicator in pre-parasitic posts
+        cursor.execute("""
+            SELECT DISTINCT username FROM user_histories WHERE is_pre_parasitic = true
+        """)
+        users = [row[0] for row in cursor.fetchall()]
+
+        matching_users = []
+        for username in users:
+            cursor.execute("""
+                SELECT title, content, created_at, subreddit, is_parasitic, parasite_score
+                FROM user_histories
+                WHERE username = %s AND is_pre_parasitic = true
+                ORDER BY created_at
+            """, (username,))
+            user_pre_posts = cursor.fetchall()
+
+            # Check which posts match the pattern
+            user_matching_posts = []
+            for title, content, created_at, subreddit, is_parasitic, score in user_pre_posts:
+                text = (content or '') + ' ' + (title or '')
+                for pattern in patterns:
+                    if re.search(pattern, text, re.IGNORECASE):
+                        user_matching_posts.append({
+                            'title': title,
+                            'content': content,
+                            'created_at': created_at,
+                            'subreddit': subreddit,
+                            'is_parasitic': is_parasitic,
+                            'score': score
+                        })
+                        break
+
+            if user_matching_posts:
+                # Get post-parasitic stats
+                cursor.execute("""
+                    SELECT COUNT(*), SUM(CASE WHEN is_parasitic THEN 1 ELSE 0 END)
+                    FROM user_histories
+                    WHERE username = %s AND is_pre_parasitic = false
+                """, (username,))
+                post_total, post_parasitic = cursor.fetchone()
+
+                # Count ALL risk factors for this user (not just the clicked one)
+                all_risk_factors = {k: 0 for k in PRE_PARASITIC_INDICATORS.keys()}
+                for title, content, _, _, _, _ in user_pre_posts:
+                    text = (content or '') + ' ' + (title or '')
+                    if text.strip():
+                        tags = tag_pre_parasitic_content(text)
+                        for tag_name, count in tags.items():
+                            all_risk_factors[tag_name] += count
+
+                matching_users.append({
+                    'username': username,
+                    'matching_posts': user_matching_posts,
+                    'post_total': post_total or 0,
+                    'post_parasitic': post_parasitic or 0,
+                    'parasitic_rate': (post_parasitic or 0) / post_total if post_total else 0,
+                    'all_risk_factors': all_risk_factors
+                })
+
+        conn.close()
+
+        if not matching_users:
+            return html.P(f"No users found with '{indicator_label}' indicators.",
+                         style={'color': COLORS['muted']}), {'display': 'block'}
+
+        # Sort by parasitic rate
+        matching_users.sort(key=lambda x: x['parasitic_rate'], reverse=True)
+
+        # Build display
+        user_sections = []
+        for u in matching_users:
+            parasitic_rate = u['parasitic_rate'] * 100
+            rate_color = COLORS['danger'] if parasitic_rate > 50 else COLORS['warning'] if parasitic_rate > 20 else COLORS['success']
+
+            # Expandable posts
+            post_items = []
+            for p in u['matching_posts'][:10]:  # Limit to 10 posts per user
+                highlighted_content = highlight_all_patterns(p['content'], is_pre_parasitic=True) if p['content'] else ['(No content)']
+
+                post_items.append(html.Details([
+                    html.Summary([
+                        html.Span(p['created_at'].strftime('%Y-%m-%d') if p['created_at'] else '',
+                                 style={'fontSize': '10px', 'color': COLORS['muted']}),
+                        html.Span(f" • r/{p['subreddit']}" if p['subreddit'] else '',
+                                 style={'fontSize': '10px', 'color': COLORS['muted']}),
+                        # Show the specific risk factor tag for this drill-down
+                        html.Span(indicator_label[:12], style={
+                            'backgroundColor': indicator_color, 'color': 'white',
+                            'padding': '1px 5px', 'borderRadius': '3px', 'fontSize': '8px', 'marginLeft': '6px'
+                        }),
+                        html.Span(" • PARASITIC", style={
+                            'backgroundColor': COLORS['danger'], 'color': 'white',
+                            'padding': '1px 4px', 'borderRadius': '3px', 'fontSize': '8px', 'marginLeft': '4px'
+                        }) if p['is_parasitic'] else None,
+                        html.P(p['title'] or p['content'][:60] + '...' if p['content'] else '',
+                              style={'fontSize': '11px', 'margin': '2px 0 0 0', 'fontWeight': '500'})
+                    ], style={'cursor': 'pointer', 'padding': '4px 8px', 'listStyle': 'none'}),
+                    html.Div(highlighted_content, style={
+                        'fontSize': '11px', 'lineHeight': '1.5', 'padding': '8px',
+                        'backgroundColor': COLORS['light'], 'borderRadius': '4px',
+                        'maxHeight': '200px', 'overflow': 'auto', 'whiteSpace': 'pre-wrap'
+                    })
+                ], style={'borderBottom': f'1px solid {COLORS["border"]}', 'marginBottom': '2px'}))
+
+            # Build risk factor badges for this user
+            user_risk_badges = []
+            for rf_name, rf_count in u.get('all_risk_factors', {}).items():
+                if rf_count > 0:
+                    rf_indicator = PRE_PARASITIC_INDICATORS.get(rf_name, {})
+                    user_risk_badges.append(html.Span([
+                        html.Span(rf_indicator.get('label', rf_name)[:8], style={'marginRight': '2px'}),
+                        html.Span(f"({rf_count})", style={'opacity': '0.8', 'fontSize': '9px'})
+                    ], style={
+                        'backgroundColor': rf_indicator.get('color', '#6b7280'),
+                        'color': 'white',
+                        'padding': '2px 5px',
+                        'borderRadius': '3px',
+                        'fontSize': '9px',
+                        'marginLeft': '4px'
+                    }))
+
+            user_sections.append(html.Div([
+                html.Div([
+                    html.Div([
+                        html.Span(u['username'], style={'fontWeight': '600', 'fontSize': '14px'}),
+                        *user_risk_badges
+                    ], style={'marginBottom': '4px'}),
+                    html.Div([
+                        html.Span(f"{len(u['matching_posts'])} matching posts",
+                                 style={'color': COLORS['muted'], 'fontSize': '11px'}),
+                        html.Span(f" • Post-parasitic rate: {parasitic_rate:.0f}%",
+                                 style={'color': rate_color, 'fontSize': '11px', 'fontWeight': '500'}),
+                        html.Span(f" ({u['post_parasitic']}/{u['post_total']} posts)",
+                                 style={'color': COLORS['muted'], 'fontSize': '10px'})
+                    ])
+                ], style={'marginBottom': '8px', 'padding': '8px', 'backgroundColor': 'rgba(0,0,0,0.03)',
+                          'borderRadius': '6px'}),
+                html.Div(post_items, style={'marginLeft': '12px'})
+            ], style={'marginBottom': '16px'}))
+
+        header = html.Div([
+            html.Span("● ", style={'color': indicator_color, 'fontSize': '16px'}),
+            html.Span(indicator_label, style={'fontWeight': '600', 'fontSize': '16px'}),
+            html.Span(f" — {len(matching_users)} users with this pre-parasitic indicator",
+                     style={'color': COLORS['muted'], 'fontSize': '13px', 'marginLeft': '8px'})
+        ], style={'marginBottom': '16px'})
+
+        visible_style = {
+            'backgroundColor': COLORS['white'],
+            'borderRadius': '12px',
+            'padding': '20px',
+            'boxShadow': '0 1px 3px rgba(0,0,0,0.1)',
+            'border': f'1px solid {COLORS["border"]}',
+            'display': 'block',
+            'maxHeight': '600px',
+            'overflow': 'auto'
+        }
+
+        return html.Div([header] + user_sections), visible_style
+
+    except Exception as e:
+        print(f"Error in correlation drilldown: {e}")
+        import traceback
+        traceback.print_exc()
+        return html.P(f"Error loading data: {e}", style={'color': COLORS['danger']}), {'display': 'block'}
 
 
 if __name__ == '__main__':
