@@ -2640,7 +2640,7 @@ def update_correlation_analysis(_):
     y_max = max_rate * 1.25  # 25% padding above highest bar for labels
 
     fig.update_layout(
-        title='Post-Parasitic Rate by Pre-Parasitic Risk Factor',
+        title='Post-Parasitic Rate by Pre-Parasitic Risk Factor (click bars for details)',
         barmode='group',
         height=450,
         margin=dict(l=20, r=20, t=80, b=80),
@@ -2648,7 +2648,8 @@ def update_correlation_analysis(_):
         plot_bgcolor='rgba(0,0,0,0)',
         yaxis=dict(showgrid=True, gridcolor=COLORS['border'], title='% Parasitic Posts After', range=[0, y_max]),
         xaxis=dict(tickangle=-45),
-        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
+        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
+        clickmode='event'  # Explicitly enable click events
     )
 
     # Build summary
