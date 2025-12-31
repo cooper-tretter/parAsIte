@@ -13,6 +13,9 @@ import csv
 import sys
 import psycopg2
 
+# Increase CSV field size limit for large transcript fields
+csv.field_size_limit(sys.maxsize)
+
 # Database connection from environment
 DB_CONFIG = {
     'host': os.environ.get('DB_HOST', 'localhost'),
@@ -81,16 +84,36 @@ def get_connection():
     return psycopg2.connect(**DB_CONFIG)
 
 
+def table_exists_and_accessible(conn, table):
+    """Check if table exists AND is actually queryable."""
+    try:
+        with conn.cursor() as cur:
+            # First check information_schema
+            cur.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = %s
+                )
+            """, (table,))
+            exists_in_schema = cur.fetchone()[0]
+
+            if not exists_in_schema:
+                return False, 0
+
+            # Now actually try to query it
+            cur.execute(f"SELECT COUNT(*) FROM {table}")
+            count = cur.fetchone()[0]
+            return True, count
+    except Exception as e:
+        conn.rollback()
+        print(f"  Warning: Table {table} exists in schema but query failed: {e}")
+        return False, -1  # Table broken, needs recreation
+
+
 def table_exists(conn, table):
-    """Check if table exists."""
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables
-                WHERE table_schema = 'public' AND table_name = %s
-            )
-        """, (table,))
-        return cur.fetchone()[0]
+    """Check if table exists (legacy wrapper)."""
+    accessible, _ = table_exists_and_accessible(conn, table)
+    return accessible
 
 
 def get_table_count(conn, table):
@@ -99,8 +122,10 @@ def get_table_count(conn, table):
         with conn.cursor() as cur:
             cur.execute(f"SELECT COUNT(*) FROM {table}")
             return cur.fetchone()[0]
-    except:
-        return 0
+    except Exception as e:
+        # Rollback to clear any aborted transaction state
+        conn.rollback()
+        return -1  # Return -1 to indicate error, not 0
 
 
 def create_and_import_user_histories(conn):
@@ -247,6 +272,11 @@ def main():
     print(f"  Database: {DB_CONFIG['dbname']}")
     print(f"  User: {DB_CONFIG['user']}")
 
+    # Check for force reseed
+    force_reseed = os.environ.get('FORCE_RESEED', '').lower() in ('1', 'true', 'yes')
+    if force_reseed:
+        print("\n*** FORCE_RESEED is set - will recreate all tables ***")
+
     print("\nConnecting to database...")
     try:
         conn = get_connection()
@@ -254,22 +284,27 @@ def main():
         print(f"ERROR: Could not connect to database: {e}")
         sys.exit(1)
 
-    # Check current state
-    uh_exists = table_exists(conn, 'user_histories')
-    tr_exists = table_exists(conn, 'transcripts')
-    uh_count = get_table_count(conn, 'user_histories') if uh_exists else 0
-    tr_count = get_table_count(conn, 'transcripts') if tr_exists else 0
+    # Check current state using the robust check
+    uh_accessible, uh_count = table_exists_and_accessible(conn, 'user_histories')
+    tr_accessible, tr_count = table_exists_and_accessible(conn, 'transcripts')
 
     print(f"\nCurrent state:")
-    print(f"  user_histories: {'exists' if uh_exists else 'missing'}, {uh_count} rows")
-    print(f"  transcripts: {'exists' if tr_exists else 'missing'}, {tr_count} rows")
+    print(f"  user_histories: {'accessible' if uh_accessible else 'NOT ACCESSIBLE'}, {uh_count} rows")
+    print(f"  transcripts: {'accessible' if tr_accessible else 'NOT ACCESSIBLE'}, {tr_count} rows")
+
+    # Force reseed if requested
+    if force_reseed:
+        uh_count = 0
+        tr_count = 0
 
     success = True
 
-    # Import user_histories if empty or missing
-    if uh_count == 0:
+    # Import user_histories if empty, missing, or inaccessible (-1 means error)
+    if uh_count <= 0:
         print("\n" + "-" * 40)
         print("Importing user_histories...")
+        if uh_count == -1:
+            print("  (Table exists in schema but is inaccessible - will recreate)")
         try:
             if not create_and_import_user_histories(conn):
                 success = False
@@ -279,10 +314,12 @@ def main():
     else:
         print(f"\nuser_histories already has {uh_count} rows, skipping.")
 
-    # Import transcripts if empty or missing
-    if tr_count == 0:
+    # Import transcripts if empty, missing, or inaccessible (-1 means error)
+    if tr_count <= 0:
         print("\n" + "-" * 40)
         print("Importing transcripts...")
+        if tr_count == -1:
+            print("  (Table exists in schema but is inaccessible - will recreate)")
         try:
             if not create_and_import_transcripts(conn):
                 success = False

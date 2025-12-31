@@ -31,6 +31,10 @@ def ensure_database_tables():
     """Ensure user_histories and transcripts tables exist and have data."""
     import gzip
     import csv
+    import sys as _sys
+
+    # Increase CSV field size limit for large transcript fields
+    csv.field_size_limit(_sys.maxsize)
 
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
     DATA_DIR = os.path.join(SCRIPT_DIR, 'data')
@@ -822,7 +826,6 @@ def debug_database():
     import json
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
 
         info = {
             'status': 'connected',
@@ -831,21 +834,25 @@ def debug_database():
             'tables': {}
         }
 
-        # Check each table
+        # Check each table with separate cursor and proper error handling
         for table in ['posts', 'user_histories', 'transcripts', 'authors']:
             try:
+                cursor = conn.cursor()
                 cursor.execute(f"SELECT COUNT(*) FROM {table}")
                 count = cursor.fetchone()[0]
 
                 # Get column names
                 cursor.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table}' ORDER BY ordinal_position")
                 columns = [row[0] for row in cursor.fetchall()]
+                cursor.close()
 
                 info['tables'][table] = {
                     'count': count,
                     'columns': columns
                 }
             except Exception as e:
+                # Rollback to clear aborted transaction state
+                conn.rollback()
                 info['tables'][table] = {'error': str(e)}
 
         conn.close()
