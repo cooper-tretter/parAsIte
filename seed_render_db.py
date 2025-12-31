@@ -78,6 +78,40 @@ CREATE INDEX idx_transcripts_model ON transcripts(model);
 CREATE INDEX idx_transcripts_parasitic ON transcripts(is_parasitic);
 """
 
+POSTS_SCHEMA = """
+DROP TABLE IF EXISTS posts CASCADE;
+CREATE TABLE posts (
+    id SERIAL PRIMARY KEY,
+    reddit_id TEXT UNIQUE,
+    subreddit TEXT,
+    author TEXT,
+    created_utc TIMESTAMP,
+    title TEXT,
+    content TEXT,
+    content_length INTEGER,
+    is_comment BOOLEAN,
+    parent_id TEXT,
+    parent_comment_id TEXT,
+    score INTEGER,
+    num_comments INTEGER,
+    category TEXT,
+    parasite_score FLOAT,
+    is_parasitic BOOLEAN,
+    ai_model TEXT,
+    external_links TEXT,
+    has_external_links BOOLEAN,
+    url TEXT,
+    collected_at TIMESTAMP DEFAULT NOW(),
+    detected_patterns JSONB,
+    data_source_type TEXT
+);
+CREATE INDEX idx_posts_subreddit ON posts(subreddit);
+CREATE INDEX idx_posts_author ON posts(author);
+CREATE INDEX idx_posts_created ON posts(created_utc);
+CREATE INDEX idx_posts_parasitic ON posts(is_parasitic);
+CREATE INDEX idx_posts_category ON posts(category);
+"""
+
 
 def get_connection():
     """Get database connection."""
@@ -262,6 +296,85 @@ def create_and_import_transcripts(conn):
     return True
 
 
+def create_and_import_posts(conn):
+    """Create posts table and import data."""
+    filepath = os.path.join(DATA_DIR, 'posts.csv.gz')
+    if not os.path.exists(filepath):
+        print(f"  ERROR: File not found: {filepath}")
+        return False
+
+    print("  Creating posts table...")
+    with conn.cursor() as cur:
+        cur.execute(POSTS_SCHEMA)
+    conn.commit()
+
+    print(f"  Importing from {filepath}...")
+
+    # Columns to import (excluding 'id' - let SERIAL auto-generate)
+    columns = [
+        'reddit_id', 'subreddit', 'author', 'created_utc', 'title', 'content',
+        'content_length', 'is_comment', 'parent_id', 'parent_comment_id',
+        'score', 'num_comments', 'category', 'parasite_score', 'is_parasitic',
+        'ai_model', 'external_links', 'has_external_links', 'url',
+        'collected_at', 'detected_patterns', 'data_source_type'
+    ]
+
+    with gzip.open(filepath, 'rt', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+
+        with conn.cursor() as cur:
+            count = 0
+            batch = []
+            batch_size = 500
+
+            for row in reader:
+                values = []
+                for col in columns:
+                    val = row.get(col, '')
+                    if val == '' or val is None:
+                        values.append(None)
+                    elif col in ('content_length', 'score', 'num_comments'):
+                        values.append(int(val) if val else None)
+                    elif col == 'parasite_score':
+                        values.append(float(val) if val else None)
+                    elif col in ('is_parasitic', 'is_comment', 'has_external_links'):
+                        values.append(val.lower() in ('t', 'true', '1'))
+                    elif col == 'detected_patterns':
+                        values.append(val if val else '{}')
+                    else:
+                        values.append(val)
+
+                batch.append(tuple(values))
+                count += 1
+
+                if len(batch) >= batch_size:
+                    placeholders = ','.join(['%s'] * len(columns))
+                    insert_sql = f"INSERT INTO posts ({','.join(columns)}) VALUES ({placeholders})"
+                    try:
+                        cur.executemany(insert_sql, batch)
+                        conn.commit()
+                    except Exception as e:
+                        print(f"    Warning: Batch error: {e}")
+                        conn.rollback()
+                    batch = []
+                    print(f"    Imported {count} rows...")
+
+            # Insert remaining
+            if batch:
+                placeholders = ','.join(['%s'] * len(columns))
+                insert_sql = f"INSERT INTO posts ({','.join(columns)}) VALUES ({placeholders})"
+                try:
+                    cur.executemany(insert_sql, batch)
+                    conn.commit()
+                except Exception as e:
+                    print(f"    Warning: Final batch error: {e}")
+                    conn.rollback()
+
+            print(f"  Imported {count} total rows into posts")
+
+    return True
+
+
 def main():
     print("=" * 60)
     print("ParAsIte Database Seeder")
@@ -287,15 +400,18 @@ def main():
     # Check current state using the robust check
     uh_accessible, uh_count = table_exists_and_accessible(conn, 'user_histories')
     tr_accessible, tr_count = table_exists_and_accessible(conn, 'transcripts')
+    posts_accessible, posts_count = table_exists_and_accessible(conn, 'posts')
 
     print(f"\nCurrent state:")
     print(f"  user_histories: {'accessible' if uh_accessible else 'NOT ACCESSIBLE'}, {uh_count} rows")
     print(f"  transcripts: {'accessible' if tr_accessible else 'NOT ACCESSIBLE'}, {tr_count} rows")
+    print(f"  posts: {'accessible' if posts_accessible else 'NOT ACCESSIBLE'}, {posts_count} rows")
 
     # Force reseed if requested
     if force_reseed:
         uh_count = 0
         tr_count = 0
+        posts_count = 0
 
     success = True
 
@@ -329,13 +445,31 @@ def main():
     else:
         print(f"\ntranscripts already has {tr_count} rows, skipping.")
 
+    # Import posts if count is less than expected (17061 is local count)
+    # Use 15000 as threshold to trigger reimport if significantly less
+    if posts_count <= 0 or posts_count < 15000:
+        print("\n" + "-" * 40)
+        print("Importing posts...")
+        if posts_count > 0:
+            print(f"  (Current count {posts_count} < 15000 threshold - will reimport)")
+        try:
+            if not create_and_import_posts(conn):
+                success = False
+        except Exception as e:
+            print(f"  ERROR: {e}")
+            success = False
+    else:
+        print(f"\nposts already has {posts_count} rows, skipping.")
+
     # Final counts
     print("\n" + "-" * 40)
     uh_count = get_table_count(conn, 'user_histories')
     tr_count = get_table_count(conn, 'transcripts')
+    posts_count = get_table_count(conn, 'posts')
     print(f"Final counts:")
     print(f"  user_histories: {uh_count}")
     print(f"  transcripts: {tr_count}")
+    print(f"  posts: {posts_count}")
 
     conn.close()
 
