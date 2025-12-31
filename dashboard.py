@@ -24,6 +24,171 @@ import os
 
 load_dotenv()
 
+# ============================================================
+# AUTO-SEED: Create missing tables and import data on startup
+# ============================================================
+def ensure_database_tables():
+    """Ensure user_histories and transcripts tables exist and have data."""
+    import gzip
+    import csv
+
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    DATA_DIR = os.path.join(SCRIPT_DIR, 'data')
+
+    DB_CONFIG = {
+        'host': os.environ.get('DB_HOST', 'localhost'),
+        'port': os.environ.get('DB_PORT', '5432'),
+        'dbname': os.environ.get('DB_NAME', 'parasite_db'),
+        'user': os.environ.get('DB_USER', 'parasite_user'),
+        'password': os.environ.get('DB_PASSWORD', ''),
+    }
+
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        cursor = conn.cursor()
+
+        # Check if user_histories exists
+        cursor.execute("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'user_histories')")
+        uh_exists = cursor.fetchone()[0]
+
+        if not uh_exists:
+            print("Creating user_histories table...")
+            cursor.execute("""
+                CREATE TABLE user_histories (
+                    id SERIAL PRIMARY KEY,
+                    username TEXT NOT NULL,
+                    reddit_id TEXT NOT NULL,
+                    post_type TEXT NOT NULL,
+                    subreddit TEXT,
+                    title TEXT,
+                    content TEXT,
+                    created_at TIMESTAMP,
+                    score INTEGER,
+                    parasite_score FLOAT,
+                    is_parasitic BOOLEAN,
+                    category TEXT,
+                    is_pre_parasitic BOOLEAN,
+                    scraped_at TIMESTAMP DEFAULT NOW(),
+                    UNIQUE(username, reddit_id)
+                )
+            """)
+            conn.commit()
+
+            # Import data
+            filepath = os.path.join(DATA_DIR, 'user_histories.csv.gz')
+            if os.path.exists(filepath):
+                print(f"Importing user_histories from {filepath}...")
+                columns = ['username', 'reddit_id', 'post_type', 'subreddit', 'title',
+                           'content', 'created_at', 'score', 'parasite_score', 'is_parasitic',
+                           'category', 'is_pre_parasitic', 'scraped_at']
+
+                with gzip.open(filepath, 'rt', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    count = 0
+                    for row in reader:
+                        values = []
+                        for col in columns:
+                            val = row.get(col, '')
+                            if val == '' or val is None:
+                                values.append(None)
+                            elif col in ('score',):
+                                values.append(int(val) if val else None)
+                            elif col == 'parasite_score':
+                                values.append(float(val) if val else None)
+                            elif col in ('is_parasitic', 'is_pre_parasitic'):
+                                values.append(val.lower() in ('t', 'true', '1'))
+                            else:
+                                values.append(val)
+
+                        placeholders = ','.join(['%s'] * len(columns))
+                        try:
+                            cursor.execute(f"INSERT INTO user_histories ({','.join(columns)}) VALUES ({placeholders})", tuple(values))
+                            count += 1
+                            if count % 1000 == 0:
+                                conn.commit()
+                                print(f"  Imported {count} user_histories rows...")
+                        except Exception as e:
+                            conn.rollback()
+                            continue
+
+                conn.commit()
+                print(f"Imported {count} total user_histories rows.")
+
+        # Check if transcripts exists
+        cursor.execute("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'transcripts')")
+        tr_exists = cursor.fetchone()[0]
+
+        if not tr_exists:
+            print("Creating transcripts table...")
+            cursor.execute("""
+                CREATE TABLE transcripts (
+                    id SERIAL PRIMARY KEY,
+                    source TEXT NOT NULL,
+                    source_type TEXT NOT NULL,
+                    transcript_id TEXT NOT NULL UNIQUE,
+                    model TEXT,
+                    scenario TEXT,
+                    transcript TEXT,
+                    turn_count INTEGER,
+                    parasite_score FLOAT,
+                    is_parasitic BOOLEAN,
+                    category TEXT,
+                    detected_patterns JSONB,
+                    metadata JSONB,
+                    scraped_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            conn.commit()
+
+            # Import data
+            filepath = os.path.join(DATA_DIR, 'transcripts.csv.gz')
+            if os.path.exists(filepath):
+                print(f"Importing transcripts from {filepath}...")
+                columns = ['source', 'source_type', 'transcript_id', 'model', 'scenario',
+                           'transcript', 'turn_count', 'parasite_score', 'is_parasitic',
+                           'category', 'detected_patterns', 'metadata', 'scraped_at']
+
+                with gzip.open(filepath, 'rt', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    count = 0
+                    for row in reader:
+                        values = []
+                        for col in columns:
+                            val = row.get(col, '')
+                            if val == '' or val is None:
+                                values.append(None)
+                            elif col == 'turn_count':
+                                values.append(int(val) if val else None)
+                            elif col == 'parasite_score':
+                                values.append(float(val) if val else None)
+                            elif col == 'is_parasitic':
+                                values.append(val.lower() in ('t', 'true', '1'))
+                            elif col in ('detected_patterns', 'metadata'):
+                                values.append(val if val else '{}')
+                            else:
+                                values.append(val)
+
+                        placeholders = ','.join(['%s'] * len(columns))
+                        try:
+                            cursor.execute(f"INSERT INTO transcripts ({','.join(columns)}) VALUES ({placeholders})", tuple(values))
+                            count += 1
+                        except Exception as e:
+                            conn.rollback()
+                            continue
+
+                conn.commit()
+                print(f"Imported {count} total transcripts rows.")
+
+        conn.close()
+        print("Database tables ready.")
+
+    except Exception as e:
+        print(f"Database setup error: {e}")
+
+# Run auto-seed on import
+print("Checking database tables...")
+ensure_database_tables()
+
 # Color scheme
 COLORS = {
     'primary': '#6366f1',      # Indigo
