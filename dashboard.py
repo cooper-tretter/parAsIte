@@ -1977,9 +1977,12 @@ def load_transcript_models():
         cursor.execute("SELECT DISTINCT model FROM transcripts WHERE model IS NOT NULL AND model != '' ORDER BY model")
         models = [row[0] for row in cursor.fetchall()]
         conn.close()
+        print(f"Loaded {len(models)} transcript models: {models}")
         return models
     except Exception as e:
         print(f"Error loading transcript models: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 
@@ -2006,9 +2009,12 @@ def load_transcripts(model_filter=None, limit=50):
         cursor.execute(query, params)
         results = cursor.fetchall()
         conn.close()
+        print(f"Loaded {len(results)} transcripts (filter={model_filter})")
         return results
     except Exception as e:
         print(f"Error loading transcripts: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 
@@ -2475,6 +2481,7 @@ def compute_aggregate_correlation():
     Compute aggregate correlation between pre-parasitic risk factors and parasitic behavior.
     Returns data for visualization.
     """
+    print("Computing aggregate correlation...")
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -2484,8 +2491,10 @@ def compute_aggregate_correlation():
             SELECT DISTINCT username FROM user_histories
         """)
         users = [row[0] for row in cursor.fetchall()]
+        print(f"Found {len(users)} users in user_histories")
 
         if not users:
+            print("No users found, returning None")
             conn.close()
             return None, None
 
