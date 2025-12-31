@@ -650,6 +650,44 @@ app = dash.Dash(__name__, suppress_callback_exceptions=True)
 app.title = "Parasitic AI Dashboard"
 server = app.server  # Expose for gunicorn
 
+# Debug endpoint to check database state
+@server.route('/debug')
+def debug_database():
+    """Show database table counts and schema info."""
+    import json
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        info = {
+            'status': 'connected',
+            'host': os.environ.get('DB_HOST', 'localhost'),
+            'database': os.environ.get('DB_NAME', 'unknown'),
+            'tables': {}
+        }
+
+        # Check each table
+        for table in ['posts', 'user_histories', 'transcripts', 'authors']:
+            try:
+                cursor.execute(f"SELECT COUNT(*) FROM {table}")
+                count = cursor.fetchone()[0]
+
+                # Get column names
+                cursor.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table}' ORDER BY ordinal_position")
+                columns = [row[0] for row in cursor.fetchall()]
+
+                info['tables'][table] = {
+                    'count': count,
+                    'columns': columns
+                }
+            except Exception as e:
+                info['tables'][table] = {'error': str(e)}
+
+        conn.close()
+        return f"<pre>{json.dumps(info, indent=2)}</pre>"
+    except Exception as e:
+        return f"<pre>Database connection error: {e}</pre>"
+
 # Load initial data
 df_all = load_data()
 
