@@ -1639,8 +1639,8 @@ def handle_drill_down(time_click, sub_click, cat_click, author_click, model_clic
     elif triggered == 'word-chart' and word_click:
         word = word_click['points'][0]['y']
         # Filter posts containing this word
-        df = df[df['content'].str.lower().str.contains(word, na=False) |
-                df['title'].fillna('').str.lower().str.contains(word, na=False)]
+        df = df[df['content'].fillna('').astype(str).str.lower().str.contains(word, na=False) |
+                df['title'].fillna('').astype(str).str.lower().str.contains(word, na=False)]
         # Show excluded words in description
         excluded = []
         if hide_stopwords:
@@ -1651,7 +1651,7 @@ def handle_drill_down(time_click, sub_click, cat_click, author_click, model_clic
         description = f"Posts containing '{word}'{excluded_str}"
     elif triggered == 'symbol-chart' and symbol_click:
         symbol = symbol_click['points'][0]['y']
-        df = df[df['content'].str.contains(symbol, na=False, regex=False)]
+        df = df[df['content'].fillna('').astype(str).str.contains(symbol, na=False, regex=False)]
         description = f"Posts containing symbol '{symbol}'"
     elif triggered == 'affect-radar' and radar_click:
         # Get the clicked dimension from theta
