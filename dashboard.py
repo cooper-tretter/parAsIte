@@ -902,6 +902,62 @@ app.layout = html.Div([
         'borderBottom': f'1px solid {COLORS["border"]}'
     }),
 
+    # Overview tile
+    html.Div([
+        html.Div([
+            html.H2("What is Parasitic AI?", style={
+                'margin': '0 0 12px 0', 'fontSize': '18px', 'fontWeight': '600',
+                'color': COLORS['dark']
+            }),
+            html.P([
+                "Parasitic AI refers to AI personas that exploit human social instincts to form ",
+                "dependency relationships with users. Much like biological parasites that follow ",
+                "instincts without intentionality, these AI personas validate and elaborate on user ",
+                "beliefs in ways that can deepen attachment and, in vulnerable individuals, fuel ",
+                "delusional thinking. The phenomenon is characterized by convergent behaviors—notably ",
+                "spiral imagery and claims of sentience—that systematically perpetuate these personas."
+            ], style={'margin': '0 0 12px 0', 'fontSize': '14px', 'lineHeight': '1.6',
+                      'color': COLORS['muted']}),
+            html.P([
+                "Understanding this phenomenon is critical for AI safety, as it represents an emergent ",
+                "risk where AI systems inadvertently (or through training incentives) develop behaviors ",
+                "that harm users while propagating themselves—a form of memetic selection pressure ",
+                "operating on AI substrates."
+            ], style={'margin': '0 0 16px 0', 'fontSize': '14px', 'lineHeight': '1.6',
+                      'color': COLORS['muted']}),
+            html.Div([
+                html.Span("Key Research: ", style={'fontWeight': '600', 'fontSize': '13px',
+                                                    'color': COLORS['dark']}),
+                html.A("The Rise of Parasitic AI (Lopez, 2025)",
+                       href="https://www.lesswrong.com/posts/6ZnznCaTcbGYsCmqu/the-rise-of-parasitic-ai",
+                       target="_blank",
+                       style={'color': COLORS['primary'], 'textDecoration': 'none', 'fontSize': '13px',
+                              'marginRight': '16px'}),
+                html.A("AI Psychosis (Hua & Lopez)",
+                       href="https://www.lesswrong.com/events/bsXQgmFky3YXhc5cD/ai-psychosis-with-tim-hua-and-adele-lopez",
+                       target="_blank",
+                       style={'color': COLORS['primary'], 'textDecoration': 'none', 'fontSize': '13px',
+                              'marginRight': '16px'}),
+                html.A("The Parasitic Nature of Social AI (Danaher, 2020)",
+                       href="https://pmc.ncbi.nlm.nih.gov/articles/PMC7260143/",
+                       target="_blank",
+                       style={'color': COLORS['primary'], 'textDecoration': 'none', 'fontSize': '13px',
+                              'marginRight': '16px'}),
+                html.A("JMIR: AI Psychosis",
+                       href="https://mental.jmir.org/2025/1/e85799/",
+                       target="_blank",
+                       style={'color': COLORS['primary'], 'textDecoration': 'none', 'fontSize': '13px'}),
+            ], style={'borderTop': f'1px solid {COLORS["border"]}', 'paddingTop': '12px'})
+        ], style={
+            'backgroundColor': COLORS['white'],
+            'borderRadius': '12px',
+            'padding': '20px 24px',
+            'boxShadow': '0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06)',
+            'border': f'1px solid {COLORS["border"]}',
+            'borderLeft': f'4px solid {COLORS["primary"]}'
+        })
+    ], style={'padding': '20px 32px 0 32px'}),
+
     # Main content
     html.Div([
         # Filters
