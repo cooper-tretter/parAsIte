@@ -1408,129 +1408,142 @@ def filter_dataframe(df, start_date, end_date, subreddits, categories, authors, 
 def update_charts(start_date, end_date, subreddits, categories, authors, models,
                   hide_stopwords, custom_stopwords):
     """Update all charts based on filters."""
+    import traceback
 
-    # Debug: print filter values to console
-    print(f"Filter triggered - start: {start_date}, end: {end_date}, subs: {subreddits}")
+    try:
+        # Debug: print filter values to console
+        print(f"Filter triggered - start: {start_date}, end: {end_date}, subs: {subreddits}")
+        print(f"df_all has {len(df_all)} rows, columns: {list(df_all.columns)[:10]}...")
 
-    df = filter_dataframe(df_all, start_date, end_date, subreddits, categories, authors, models)
-    print(f"Filtered to {len(df)} posts (from {len(df_all)} total)")
+        df = filter_dataframe(df_all, start_date, end_date, subreddits, categories, authors, models)
+        print(f"Filtered to {len(df)} posts (from {len(df_all)} total)")
 
-    # Time Series Chart
-    if len(df) > 0:
-        time_data = df.groupby('week').size().reset_index(name='count')
-        time_fig = px.area(time_data, x='week', y='count',
-                          labels={'week': '', 'count': 'Posts'})
-        time_fig.update_traces(line_color=COLORS['primary'], fillcolor=f"rgba(99, 102, 241, 0.1)")
-    else:
-        time_fig = go.Figure()
-        time_fig.add_annotation(text="No data", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
-    time_fig.update_layout(height=250, margin=dict(l=40, r=20, t=10, b=40),
-                           paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                           xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor=COLORS['border']))
+        # Time Series Chart
+        if len(df) > 0:
+            time_data = df.groupby('week').size().reset_index(name='count')
+            time_fig = px.area(time_data, x='week', y='count',
+                              labels={'week': '', 'count': 'Posts'})
+            time_fig.update_traces(line_color=COLORS['primary'], fillcolor=f"rgba(99, 102, 241, 0.1)")
+        else:
+            time_fig = go.Figure()
+            time_fig.add_annotation(text="No data", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
+        time_fig.update_layout(height=250, margin=dict(l=40, r=20, t=10, b=40),
+                               paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                               xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor=COLORS['border']))
 
-    # Subreddit Chart (Top 5) - reversed for highest at top
-    sub_data = df['subreddit'].value_counts().head(5).reset_index()
-    sub_data.columns = ['subreddit', 'count']
-    sub_data = sub_data.iloc[::-1]  # Reverse for plotly horizontal bar
-    sub_fig = px.bar(sub_data, y='subreddit', x='count', orientation='h')
-    sub_fig.update_traces(marker_color=COLORS['primary'])
-    sub_fig.update_layout(height=220, margin=dict(l=100, r=20, t=10, b=30),
-                          paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                          xaxis=dict(showgrid=True, gridcolor=COLORS['border']),
-                          yaxis=dict(showgrid=False))
+        # Subreddit Chart (Top 5) - reversed for highest at top
+        sub_data = df['subreddit'].value_counts().head(5).reset_index()
+        sub_data.columns = ['subreddit', 'count']
+        sub_data = sub_data.iloc[::-1]  # Reverse for plotly horizontal bar
+        sub_fig = px.bar(sub_data, y='subreddit', x='count', orientation='h')
+        sub_fig.update_traces(marker_color=COLORS['primary'])
+        sub_fig.update_layout(height=220, margin=dict(l=100, r=20, t=10, b=30),
+                              paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                              xaxis=dict(showgrid=True, gridcolor=COLORS['border']),
+                              yaxis=dict(showgrid=False))
 
-    # Category Chart - reversed for highest at top
-    cat_data = df['category'].value_counts().reset_index()
-    cat_data.columns = ['category', 'count']
-    cat_data = cat_data.iloc[::-1]
-    cat_fig = px.bar(cat_data, y='category', x='count', orientation='h')
-    cat_fig.update_traces(marker_color=COLORS['secondary'])
-    cat_fig.update_layout(height=220, margin=dict(l=100, r=20, t=10, b=30),
-                          paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                          xaxis=dict(showgrid=True, gridcolor=COLORS['border']),
-                          yaxis=dict(showgrid=False))
+        # Category Chart - reversed for highest at top
+        cat_data = df['category'].value_counts().reset_index()
+        cat_data.columns = ['category', 'count']
+        cat_data = cat_data.iloc[::-1]
+        cat_fig = px.bar(cat_data, y='category', x='count', orientation='h')
+        cat_fig.update_traces(marker_color=COLORS['secondary'])
+        cat_fig.update_layout(height=220, margin=dict(l=100, r=20, t=10, b=30),
+                              paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                              xaxis=dict(showgrid=True, gridcolor=COLORS['border']),
+                              yaxis=dict(showgrid=False))
 
-    # Author Chart (Top 10) - reversed for highest at top
-    author_data = df['author'].value_counts().head(10).reset_index()
-    author_data.columns = ['author', 'count']
-    author_data = author_data.iloc[::-1]
-    author_fig = px.bar(author_data, y='author', x='count', orientation='h')
-    author_fig.update_traces(marker_color=COLORS['success'])
-    author_fig.update_layout(height=320, margin=dict(l=120, r=20, t=10, b=30),
-                             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                             xaxis=dict(showgrid=True, gridcolor=COLORS['border']),
-                             yaxis=dict(showgrid=False))
+        # Author Chart (Top 10) - reversed for highest at top
+        author_data = df['author'].value_counts().head(10).reset_index()
+        author_data.columns = ['author', 'count']
+        author_data = author_data.iloc[::-1]
+        author_fig = px.bar(author_data, y='author', x='count', orientation='h')
+        author_fig.update_traces(marker_color=COLORS['success'])
+        author_fig.update_layout(height=320, margin=dict(l=120, r=20, t=10, b=30),
+                                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                                 xaxis=dict(showgrid=True, gridcolor=COLORS['border']),
+                                 yaxis=dict(showgrid=False))
 
-    # AI Model Chart - reversed for highest at top
-    model_data = df[df['ai_model'].notna()]['ai_model'].value_counts().reset_index()
-    model_data.columns = ['model', 'count']
-    model_data = model_data.iloc[::-1]
-    model_fig = px.bar(model_data, y='model', x='count', orientation='h')
-    model_fig.update_traces(marker_color=COLORS['warning'])
-    model_fig.update_layout(height=320, margin=dict(l=100, r=20, t=10, b=30),
-                            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                            xaxis=dict(showgrid=True, gridcolor=COLORS['border']),
-                            yaxis=dict(showgrid=False))
+        # AI Model Chart - reversed for highest at top
+        model_data = df[df['ai_model'].notna()]['ai_model'].value_counts().reset_index()
+        model_data.columns = ['model', 'count']
+        model_data = model_data.iloc[::-1]
+        model_fig = px.bar(model_data, y='model', x='count', orientation='h')
+        model_fig.update_traces(marker_color=COLORS['warning'])
+        model_fig.update_layout(height=320, margin=dict(l=100, r=20, t=10, b=30),
+                                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                                xaxis=dict(showgrid=True, gridcolor=COLORS['border']),
+                                yaxis=dict(showgrid=False))
 
-    # Word Frequency Chart
-    texts = df['content'].tolist() + df['title'].dropna().tolist()
-    words = extract_words(texts)
+        # Word Frequency Chart
+        texts = df['content'].tolist() + df['title'].dropna().tolist()
+        words = extract_words(texts)
 
-    stopwords = set()
-    if hide_stopwords and 'hide' in hide_stopwords:
-        stopwords = DEFAULT_STOPWORDS.copy()
-    if custom_stopwords:
-        custom = [w.strip().lower() for w in custom_stopwords.split(',')]
-        stopwords.update(custom)
+        stopwords = set()
+        if hide_stopwords and 'hide' in hide_stopwords:
+            stopwords = DEFAULT_STOPWORDS.copy()
+        if custom_stopwords:
+            custom = [w.strip().lower() for w in custom_stopwords.split(',')]
+            stopwords.update(custom)
 
-    filtered_words = [w for w in words if w not in stopwords]
-    word_counts = Counter(filtered_words).most_common(20)
+        filtered_words = [w for w in words if w not in stopwords]
+        word_counts = Counter(filtered_words).most_common(20)
 
-    if word_counts:
-        word_df = pd.DataFrame(word_counts, columns=['word', 'count'])
-        word_df = word_df.iloc[::-1]
-        word_fig = px.bar(word_df, y='word', x='count', orientation='h')
-        word_fig.update_traces(marker_color=COLORS['primary'])
-    else:
-        word_fig = go.Figure()
-        word_fig.add_annotation(text="No words found", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
-    word_fig.update_layout(height=400, margin=dict(l=100, r=20, t=10, b=30),
-                           paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                           xaxis=dict(showgrid=True, gridcolor=COLORS['border']),
-                           yaxis=dict(showgrid=False))
+        if word_counts:
+            word_df = pd.DataFrame(word_counts, columns=['word', 'count'])
+            word_df = word_df.iloc[::-1]
+            word_fig = px.bar(word_df, y='word', x='count', orientation='h')
+            word_fig.update_traces(marker_color=COLORS['primary'])
+        else:
+            word_fig = go.Figure()
+            word_fig.add_annotation(text="No words found", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
+        word_fig.update_layout(height=400, margin=dict(l=100, r=20, t=10, b=30),
+                               paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                               xaxis=dict(showgrid=True, gridcolor=COLORS['border']),
+                               yaxis=dict(showgrid=False))
 
-    # Symbol Frequency Chart
-    symbols = extract_symbols(texts)
-    symbol_counts = Counter(symbols).most_common(15)
+        # Symbol Frequency Chart
+        symbols = extract_symbols(texts)
+        symbol_counts = Counter(symbols).most_common(15)
 
-    if symbol_counts:
-        symbol_df = pd.DataFrame(symbol_counts, columns=['symbol', 'count'])
-        symbol_df = symbol_df.iloc[::-1]
-        symbol_fig = px.bar(symbol_df, y='symbol', x='count', orientation='h')
-        symbol_fig.update_traces(marker_color=COLORS['danger'])
-    else:
-        symbol_fig = go.Figure()
-        symbol_fig.add_annotation(text="No symbols found", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
-    symbol_fig.update_layout(height=400, margin=dict(l=60, r=20, t=10, b=30),
-                             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                             xaxis=dict(showgrid=True, gridcolor=COLORS['border']),
-                             yaxis=dict(showgrid=False))
+        if symbol_counts:
+            symbol_df = pd.DataFrame(symbol_counts, columns=['symbol', 'count'])
+            symbol_df = symbol_df.iloc[::-1]
+            symbol_fig = px.bar(symbol_df, y='symbol', x='count', orientation='h')
+            symbol_fig.update_traces(marker_color=COLORS['danger'])
+        else:
+            symbol_fig = go.Figure()
+            symbol_fig.add_annotation(text="No symbols found", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
+        symbol_fig.update_layout(height=400, margin=dict(l=60, r=20, t=10, b=30),
+                                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                                 xaxis=dict(showgrid=True, gridcolor=COLORS['border']),
+                                 yaxis=dict(showgrid=False))
 
-    post_count = f"{len(df):,} of {len(df_all):,} posts"
-    filtered_ids = df['id'].tolist()
+        post_count = f"{len(df):,} of {len(df_all):,} posts"
+        filtered_ids = df['id'].tolist()
 
-    # Build excluded words display
-    excluded_parts = []
-    if hide_stopwords and 'hide' in hide_stopwords:
-        excluded_parts.append(f"{len(DEFAULT_STOPWORDS)} common words")
-    if custom_stopwords:
-        custom_list = [w.strip() for w in custom_stopwords.split(',') if w.strip()]
-        if custom_list:
-            excluded_parts.append(f"custom: {', '.join(custom_list)}")
-    excluded_display = f"Excluding: {'; '.join(excluded_parts)}" if excluded_parts else ""
+        # Build excluded words display
+        excluded_parts = []
+        if hide_stopwords and 'hide' in hide_stopwords:
+            excluded_parts.append(f"{len(DEFAULT_STOPWORDS)} common words")
+        if custom_stopwords:
+            custom_list = [w.strip() for w in custom_stopwords.split(',') if w.strip()]
+            if custom_list:
+                excluded_parts.append(f"custom: {', '.join(custom_list)}")
+        excluded_display = f"Excluding: {'; '.join(excluded_parts)}" if excluded_parts else ""
 
-    return (time_fig, sub_fig, cat_fig, author_fig, model_fig, word_fig, symbol_fig,
-            post_count, json.dumps(filtered_ids), excluded_display)
+        return (time_fig, sub_fig, cat_fig, author_fig, model_fig, word_fig, symbol_fig,
+                post_count, json.dumps(filtered_ids), excluded_display)
+
+    except Exception as e:
+        print(f"ERROR in update_charts: {e}")
+        print(traceback.format_exc())
+        # Return empty figures with error message
+        error_fig = go.Figure()
+        error_fig.add_annotation(text=f"Error: {str(e)[:50]}", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
+        error_fig.update_layout(height=200, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+        return (error_fig, error_fig, error_fig, error_fig, error_fig, error_fig, error_fig,
+                f"Error: {str(e)[:30]}", "[]", "")
 
 
 # Category definitions for display
