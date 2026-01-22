@@ -933,11 +933,6 @@ app.layout = html.Div([
                        target="_blank",
                        style={'color': COLORS['primary'], 'textDecoration': 'none', 'fontSize': '13px',
                               'marginRight': '16px'}),
-                html.A("AI Psychosis (Hua & Lopez)",
-                       href="https://www.lesswrong.com/events/bsXQgmFky3YXhc5cD/ai-psychosis-with-tim-hua-and-adele-lopez",
-                       target="_blank",
-                       style={'color': COLORS['primary'], 'textDecoration': 'none', 'fontSize': '13px',
-                              'marginRight': '16px'}),
                 html.A("The Parasitic Nature of Social AI (Danaher, 2020)",
                        href="https://pmc.ncbi.nlm.nih.gov/articles/PMC7260143/",
                        target="_blank",
@@ -1889,19 +1884,22 @@ def export_all_data(n_clicks, start_date, end_date, subreddits, categories, auth
 
 # Pre-compute affect scores and merge into df_all at startup
 def add_affect_scores_to_df(df):
-    """Add affect score columns to dataframe."""
+    """Add affect score columns to dataframe using vectorized operations."""
     dimensions = list(AFFECT_PATTERNS.keys())
 
-    # Initialize columns
-    for dim in dimensions:
-        df[f'affect_{dim.lower()}'] = 0
+    # Combine title and content into a single text column for scoring
+    df['_combined_text'] = (df['title'].fillna('') + ' ' + df['content'].fillna('')).str.lower()
 
-    # Compute scores for each post
-    for idx, row in df.iterrows():
-        text = f"{row['title'] or ''} {row['content'] or ''}"
-        scores = score_affect(text)
-        for dim in dimensions:
-            df.at[idx, f'affect_{dim.lower()}'] = scores[dim]
+    # Vectorized scoring for each dimension
+    for dim in dimensions:
+        col_name = f'affect_{dim.lower()}'
+        # Sum matches across all patterns for this dimension
+        df[col_name] = 0
+        for pattern in AFFECT_PATTERNS[dim]:
+            df[col_name] += df['_combined_text'].str.count(pattern, flags=re.IGNORECASE)
+
+    # Clean up temporary column
+    df.drop('_combined_text', axis=1, inplace=True)
 
     return df
 
