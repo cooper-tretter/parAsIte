@@ -1901,7 +1901,8 @@ def add_affect_scores_to_df(df):
     dimensions = list(AFFECT_PATTERNS.keys())
 
     # Combine title and content into a single text column for scoring
-    df['_combined_text'] = (df['title'].fillna('') + ' ' + df['content'].fillna('')).str.lower()
+    # Convert to string first to handle any float/NaN values
+    df['_combined_text'] = (df['title'].fillna('').astype(str) + ' ' + df['content'].fillna('').astype(str)).str.lower()
 
     # Vectorized scoring for each dimension
     for dim in dimensions:
