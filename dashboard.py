@@ -764,7 +764,7 @@ def extract_words(texts):
     """Extract words from texts for frequency analysis."""
     words = []
     for text in texts:
-        if text:
+        if text and isinstance(text, str):
             words.extend(re.findall(r'\b[a-zA-Z]{3,}\b', text.lower()))
     return words
 
@@ -774,7 +774,7 @@ def extract_symbols(texts):
     symbol_pattern = re.compile(r'[🜀-🜿⊛∞◈⟡✧༄☽☾⚝✺❋⋆✦✴✵✶✷✸✹★☆⭐🌟💫✨🔯🌀💠🔷🔶▲△▼▽◆◇○●◎◉⬡⬢]')
     symbols = []
     for text in texts:
-        if text:
+        if text and isinstance(text, str):
             symbols.extend(symbol_pattern.findall(text))
     return symbols
 
