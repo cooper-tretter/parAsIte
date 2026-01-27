@@ -949,7 +949,7 @@ app.layout = html.Div([
                        target="_blank",
                        style={'color': COLORS['primary'], 'textDecoration': 'none', 'fontSize': '13px',
                               'marginRight': '24px'}),
-                html.Span("Creator: ", style={'fontWeight': '600', 'fontSize': '13px',
+                html.Span("Dash & Scraper Creator: ", style={'fontWeight': '600', 'fontSize': '13px',
                                               'color': COLORS['dark']}),
                 html.Span("Cooper Tretter, coopertretter@gmail.com, ",
                           style={'fontSize': '13px', 'color': COLORS['muted']}),
