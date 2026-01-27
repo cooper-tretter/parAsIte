@@ -954,7 +954,7 @@ app.layout = html.Div([
                 html.Span("Cooper Tretter, coopertretter@gmail.com, ",
                           style={'fontSize': '13px', 'color': COLORS['muted']}),
                 html.A("LinkedIn",
-                       href="https://www.linkedin.com/feed/update/urn:li:activity:7415446521816727554/",
+                       href="https://www.linkedin.com/in/cooper-tretter-1001b5167/",
                        target="_blank",
                        style={'color': COLORS['primary'], 'textDecoration': 'none', 'fontSize': '13px'}),
             ], style={'paddingTop': '8px'})
