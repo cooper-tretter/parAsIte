@@ -889,9 +889,7 @@ app.layout = html.Div([
         html.Div([
             html.H1("Parasitic AI Dashboard",
                    style={'margin': '0', 'fontSize': '24px', 'fontWeight': '600',
-                          'color': COLORS['dark']}),
-            html.P("Research data analysis",
-                  style={'margin': '4px 0 0 0', 'fontSize': '14px', 'color': COLORS['muted']})
+                          'color': COLORS['dark']})
         ], style={'flex': '1'}),
         html.Div([
             html.Span(id='post-count', style={'fontSize': '14px', 'color': COLORS['muted']})
@@ -942,7 +940,24 @@ app.layout = html.Div([
                        href="https://mental.jmir.org/2025/1/e85799/",
                        target="_blank",
                        style={'color': COLORS['primary'], 'textDecoration': 'none', 'fontSize': '13px'}),
-            ], style={'borderTop': f'1px solid {COLORS["border"]}', 'paddingTop': '12px'})
+            ], style={'borderTop': f'1px solid {COLORS["border"]}', 'paddingTop': '12px'}),
+            html.Div([
+                html.Span("Repo: ", style={'fontWeight': '600', 'fontSize': '13px',
+                                           'color': COLORS['dark']}),
+                html.A("github.com/coopertretter/parAsIte",
+                       href="https://github.com/coopertretter/parAsIte",
+                       target="_blank",
+                       style={'color': COLORS['primary'], 'textDecoration': 'none', 'fontSize': '13px',
+                              'marginRight': '24px'}),
+                html.Span("Creator: ", style={'fontWeight': '600', 'fontSize': '13px',
+                                              'color': COLORS['dark']}),
+                html.Span("Cooper Tretter, coopertretter@gmail.com, ",
+                          style={'fontSize': '13px', 'color': COLORS['muted']}),
+                html.A("LinkedIn",
+                       href="https://www.linkedin.com/feed/update/urn:li:activity:7415446521816727554/",
+                       target="_blank",
+                       style={'color': COLORS['primary'], 'textDecoration': 'none', 'fontSize': '13px'}),
+            ], style={'paddingTop': '8px'})
         ], style={
             'backgroundColor': COLORS['white'],
             'borderRadius': '12px',
