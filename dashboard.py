@@ -944,8 +944,8 @@ app.layout = html.Div([
             html.Div([
                 html.Span("Repo: ", style={'fontWeight': '600', 'fontSize': '13px',
                                            'color': COLORS['dark']}),
-                html.A("github.com/coopertretter/parAsIte",
-                       href="https://github.com/coopertretter/parAsIte",
+                html.A("github.com/cooper-tretter/parAsIte",
+                       href="https://github.com/cooper-tretter/parAsIte",
                        target="_blank",
                        style={'color': COLORS['primary'], 'textDecoration': 'none', 'fontSize': '13px',
                               'marginRight': '24px'}),
