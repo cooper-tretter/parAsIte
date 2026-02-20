@@ -1309,13 +1309,18 @@ app.clientside_callback(
     """
     function(chartsLoaded) {
         if (chartsLoaded) {
-            var overlay = document.getElementById('loading-overlay');
-            if (overlay) {
-                overlay.classList.add('fade-out');
+            // Wait for Plotly to finish rendering charts before fading out
+            requestAnimationFrame(function() {
                 setTimeout(function() {
-                    overlay.classList.add('hidden');
-                }, 800);
-            }
+                    var overlay = document.getElementById('loading-overlay');
+                    if (overlay) {
+                        overlay.classList.add('fade-out');
+                        setTimeout(function() {
+                            overlay.classList.add('hidden');
+                        }, 800);
+                    }
+                }, 600);
+            });
         }
         return window.dash_clientside.no_update;
     }
