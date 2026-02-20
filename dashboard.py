@@ -34,10 +34,10 @@ COLORS = {
     'warning': '#f59e0b',      # Amber
     'danger': '#ef4444',       # Red
     'dark': '#1f2937',         # Gray 800
-    'light': '#f3f4f6',        # Gray 100
-    'white': '#ffffff',
-    'muted': '#6b7280',        # Gray 500
-    'border': '#e5e7eb',       # Gray 200
+    'light': '#f5f0e6',        # Papyrus / cream (page background)
+    'white': '#faf7f0',        # Warm white (card backgrounds)
+    'muted': '#78716c',        # Warm gray (stone-500)
+    'border': '#e2ddd3',       # Warm border
 }
 
 # Default stopwords to hide in word frequency
