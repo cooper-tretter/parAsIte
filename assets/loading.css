@@ -1,0 +1,248 @@
+/* ============================================================
+   ParAsIte CRT Terminal Loading Screen
+   Retro 64-bit boot sequence with scan lines and phosphor glow
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap');
+
+/* Full-page CRT overlay */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999;
+    background-color: #0a0a0a;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    font-family: 'VT323', 'Courier New', monospace;
+    color: #00ff41;
+    transition: opacity 0.8s ease-out;
+    overflow: hidden;
+}
+
+.loading-overlay.fade-out {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.loading-overlay.hidden {
+    display: none;
+}
+
+/* CRT scan lines */
+.loading-overlay::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.15) 0px,
+        rgba(0, 0, 0, 0.15) 1px,
+        transparent 1px,
+        transparent 2px
+    );
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* Subtle phosphor flicker */
+.loading-overlay::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 255, 65, 0.02);
+    animation: crt-flicker 0.1s infinite;
+    pointer-events: none;
+    z-index: 11;
+}
+
+@keyframes crt-flicker {
+    0% { opacity: 0.9; }
+    5% { opacity: 0.85; }
+    10% { opacity: 0.95; }
+    15% { opacity: 0.8; }
+    20% { opacity: 0.9; }
+    30% { opacity: 0.95; }
+    40% { opacity: 0.85; }
+    50% { opacity: 0.92; }
+    60% { opacity: 0.88; }
+    70% { opacity: 0.95; }
+    80% { opacity: 0.9; }
+    90% { opacity: 0.85; }
+    100% { opacity: 0.92; }
+}
+
+/* CRT screen vignette (darkened edges) */
+.crt-vignette {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.65) 100%);
+    pointer-events: none;
+    z-index: 12;
+}
+
+/* ASCII art container */
+.ascii-art {
+    font-family: 'VT323', 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.15;
+    color: #00ff41;
+    margin-bottom: 24px;
+    position: relative;
+    z-index: 5;
+    white-space: pre;
+    text-align: center;
+    text-shadow: 0 0 8px rgba(0, 255, 65, 0.4);
+    animation: glow-pulse 2s ease-in-out infinite;
+}
+
+@keyframes glow-pulse {
+    0%, 100% { text-shadow: 0 0 8px rgba(0, 255, 65, 0.4); }
+    50% { text-shadow: 0 0 16px rgba(0, 255, 65, 0.6), 0 0 32px rgba(0, 255, 65, 0.2); }
+}
+
+/* Title text */
+.boot-title {
+    font-family: 'Press Start 2P', 'VT323', monospace;
+    font-size: 14px;
+    color: #00ff41;
+    text-align: center;
+    margin-bottom: 32px;
+    position: relative;
+    z-index: 5;
+    letter-spacing: 4px;
+    text-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
+}
+
+/* Boot sequence text container */
+.boot-text {
+    position: relative;
+    z-index: 5;
+    text-align: left;
+    max-width: 520px;
+    width: 100%;
+    padding: 0 40px;
+}
+
+.boot-text .line {
+    font-size: 16px;
+    line-height: 1.9;
+    opacity: 0;
+    animation: type-in 0.15s forwards;
+    white-space: pre;
+    text-shadow: 0 0 4px rgba(0, 255, 65, 0.3);
+}
+
+@keyframes type-in {
+    from {
+        opacity: 0;
+        transform: translateY(2px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Status colors */
+.status-ok {
+    color: #00ff41;
+}
+
+.status-warn {
+    color: #f59e0b;
+}
+
+.status-loading {
+    color: #6366f1;
+    animation: blink-text 0.8s infinite;
+}
+
+@keyframes blink-text {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0.3; }
+}
+
+/* Progress bar container */
+.progress-container {
+    position: relative;
+    z-index: 5;
+    margin-top: 24px;
+    width: 100%;
+    max-width: 440px;
+    padding: 0 40px;
+}
+
+.progress-label {
+    font-size: 14px;
+    color: #00aa30;
+    margin-bottom: 6px;
+}
+
+.progress-bar {
+    font-size: 20px;
+    letter-spacing: 1px;
+    color: #00ff41;
+    text-shadow: 0 0 6px rgba(0, 255, 65, 0.4);
+    overflow: hidden;
+}
+
+/* Animated progress fill */
+.progress-fill {
+    display: inline-block;
+    animation: fill-progress 3s ease-in-out forwards;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+@keyframes fill-progress {
+    0% { width: 0; }
+    20% { width: 20%; }
+    40% { width: 45%; }
+    60% { width: 60%; }
+    75% { width: 80%; }
+    90% { width: 92%; }
+    100% { width: 100%; }
+}
+
+/* Blinking cursor */
+.cursor {
+    display: inline-block;
+    animation: blink-cursor 0.7s infinite;
+    color: #00ff41;
+    text-shadow: 0 0 6px rgba(0, 255, 65, 0.5);
+}
+
+@keyframes blink-cursor {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+}
+
+/* Dim secondary text */
+.boot-dim {
+    color: #006620;
+}
+
+/* Version tag */
+.boot-version {
+    font-size: 12px;
+    color: #005518;
+    text-align: center;
+    margin-top: 24px;
+    position: relative;
+    z-index: 5;
+    letter-spacing: 1px;
+}

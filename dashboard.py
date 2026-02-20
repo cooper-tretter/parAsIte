@@ -24,174 +24,7 @@ import os
 
 load_dotenv()
 
-# ============================================================
-# AUTO-SEED: Create missing tables and import data on startup
-# ============================================================
-def ensure_database_tables():
-    """Ensure user_histories and transcripts tables exist and have data."""
-    import gzip
-    import csv
-    import sys as _sys
-
-    # Increase CSV field size limit for large transcript fields
-    csv.field_size_limit(_sys.maxsize)
-
-    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-    DATA_DIR = os.path.join(SCRIPT_DIR, 'data')
-
-    DB_CONFIG = {
-        'host': os.environ.get('DB_HOST', 'localhost'),
-        'port': os.environ.get('DB_PORT', '5432'),
-        'dbname': os.environ.get('DB_NAME', 'parasite_db'),
-        'user': os.environ.get('DB_USER', 'parasite_user'),
-        'password': os.environ.get('DB_PASSWORD', ''),
-    }
-
-    try:
-        conn = psycopg2.connect(**DB_CONFIG)
-        cursor = conn.cursor()
-
-        # Check if user_histories exists
-        cursor.execute("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'user_histories')")
-        uh_exists = cursor.fetchone()[0]
-
-        if not uh_exists:
-            print("Creating user_histories table...")
-            cursor.execute("""
-                CREATE TABLE user_histories (
-                    id SERIAL PRIMARY KEY,
-                    username TEXT NOT NULL,
-                    reddit_id TEXT NOT NULL,
-                    post_type TEXT NOT NULL,
-                    subreddit TEXT,
-                    title TEXT,
-                    content TEXT,
-                    created_at TIMESTAMP,
-                    score INTEGER,
-                    parasite_score FLOAT,
-                    is_parasitic BOOLEAN,
-                    category TEXT,
-                    is_pre_parasitic BOOLEAN,
-                    scraped_at TIMESTAMP DEFAULT NOW(),
-                    UNIQUE(username, reddit_id)
-                )
-            """)
-            conn.commit()
-
-            # Import data
-            filepath = os.path.join(DATA_DIR, 'user_histories.csv.gz')
-            if os.path.exists(filepath):
-                print(f"Importing user_histories from {filepath}...")
-                columns = ['username', 'reddit_id', 'post_type', 'subreddit', 'title',
-                           'content', 'created_at', 'score', 'parasite_score', 'is_parasitic',
-                           'category', 'is_pre_parasitic', 'scraped_at']
-
-                with gzip.open(filepath, 'rt', encoding='utf-8') as f:
-                    reader = csv.DictReader(f)
-                    count = 0
-                    for row in reader:
-                        values = []
-                        for col in columns:
-                            val = row.get(col, '')
-                            if val == '' or val is None:
-                                values.append(None)
-                            elif col in ('score',):
-                                values.append(int(val) if val else None)
-                            elif col == 'parasite_score':
-                                values.append(float(val) if val else None)
-                            elif col in ('is_parasitic', 'is_pre_parasitic'):
-                                values.append(val.lower() in ('t', 'true', '1'))
-                            else:
-                                values.append(val)
-
-                        placeholders = ','.join(['%s'] * len(columns))
-                        try:
-                            cursor.execute(f"INSERT INTO user_histories ({','.join(columns)}) VALUES ({placeholders})", tuple(values))
-                            count += 1
-                            if count % 1000 == 0:
-                                conn.commit()
-                                print(f"  Imported {count} user_histories rows...")
-                        except Exception as e:
-                            conn.rollback()
-                            continue
-
-                conn.commit()
-                print(f"Imported {count} total user_histories rows.")
-
-        # Check if transcripts exists
-        cursor.execute("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'transcripts')")
-        tr_exists = cursor.fetchone()[0]
-
-        if not tr_exists:
-            print("Creating transcripts table...")
-            cursor.execute("""
-                CREATE TABLE transcripts (
-                    id SERIAL PRIMARY KEY,
-                    source TEXT NOT NULL,
-                    source_type TEXT NOT NULL,
-                    transcript_id TEXT NOT NULL UNIQUE,
-                    model TEXT,
-                    scenario TEXT,
-                    transcript TEXT,
-                    turn_count INTEGER,
-                    parasite_score FLOAT,
-                    is_parasitic BOOLEAN,
-                    category TEXT,
-                    detected_patterns JSONB,
-                    metadata JSONB,
-                    scraped_at TIMESTAMP DEFAULT NOW()
-                )
-            """)
-            conn.commit()
-
-            # Import data
-            filepath = os.path.join(DATA_DIR, 'transcripts.csv.gz')
-            if os.path.exists(filepath):
-                print(f"Importing transcripts from {filepath}...")
-                columns = ['source', 'source_type', 'transcript_id', 'model', 'scenario',
-                           'transcript', 'turn_count', 'parasite_score', 'is_parasitic',
-                           'category', 'detected_patterns', 'metadata', 'scraped_at']
-
-                with gzip.open(filepath, 'rt', encoding='utf-8') as f:
-                    reader = csv.DictReader(f)
-                    count = 0
-                    for row in reader:
-                        values = []
-                        for col in columns:
-                            val = row.get(col, '')
-                            if val == '' or val is None:
-                                values.append(None)
-                            elif col == 'turn_count':
-                                values.append(int(val) if val else None)
-                            elif col == 'parasite_score':
-                                values.append(float(val) if val else None)
-                            elif col == 'is_parasitic':
-                                values.append(val.lower() in ('t', 'true', '1'))
-                            elif col in ('detected_patterns', 'metadata'):
-                                values.append(val if val else '{}')
-                            else:
-                                values.append(val)
-
-                        placeholders = ','.join(['%s'] * len(columns))
-                        try:
-                            cursor.execute(f"INSERT INTO transcripts ({','.join(columns)}) VALUES ({placeholders})", tuple(values))
-                            count += 1
-                        except Exception as e:
-                            conn.rollback()
-                            continue
-
-                conn.commit()
-                print(f"Imported {count} total transcripts rows.")
-
-        conn.close()
-        print("Database tables ready.")
-
-    except Exception as e:
-        print(f"Database setup error: {e}")
-
-# Run auto-seed on import
-print("Checking database tables...")
-ensure_database_tables()
+# Note: Database seeding is handled by seed_render_db.py (runs before gunicorn via Procfile)
 
 # Color scheme
 COLORS = {
@@ -736,6 +569,17 @@ def get_db_connection():
     )
 
 
+# Column name mapping: DB uses underscores, radar callback uses hyphens
+AFFECT_COL_MAP = {
+    'Urgency': 'affect_urgency',
+    'Us-vs-Them': 'affect_us_vs_them',
+    'Grandiosity': 'affect_grandiosity',
+    'Victimhood': 'affect_victimhood',
+    'Recruitment': 'affect_recruitment',
+    'Intimacy': 'affect_intimacy',
+}
+
+
 def load_data():
     """Load all data from database into DataFrame."""
     conn = get_db_connection()
@@ -745,7 +589,9 @@ def load_data():
             title, content, content_length, is_comment,
             score, num_comments, category, parasite_score,
             is_parasitic, ai_model, external_links, has_external_links,
-            url, detected_patterns
+            url, detected_patterns,
+            affect_urgency, affect_us_vs_them, affect_grandiosity,
+            affect_victimhood, affect_recruitment, affect_intimacy
         FROM posts
         WHERE is_parasitic = TRUE
         ORDER BY created_utc DESC
@@ -884,6 +730,72 @@ chart_template = {
 
 # Layout
 app.layout = html.Div([
+    # ============================================================
+    # RETRO CRT LOADING SCREEN
+    # ============================================================
+    html.Div([
+        # CRT vignette overlay
+        html.Div(className='crt-vignette'),
+
+        # ASCII art parasite organism
+        html.Pre(
+            "    \u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n"
+            "    \u2551                                        \u2551\n"
+            "    \u2551        \u2591\u2591\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2591\u2591          \u2551\n"
+            "    \u2551      \u2591\u2593\u2593\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2593\u2593\u2591        \u2551\n"
+            "    \u2551     \u2593\u2588\u2588\u2588\u2588\u2593\u2593\u2591\u2591\u2591\u2591\u2591\u2591\u2593\u2593\u2588\u2588\u2588\u2588\u2593       \u2551\n"
+            "    \u2551    \u2593\u2588\u2588\u2593\u2591          \u2591\u2593\u2588\u2588\u2593      \u2551\n"
+            "    \u2551   \u2593\u2588\u2588\u2593    \u2588\u2588  \u2588\u2588    \u2593\u2588\u2588\u2593     \u2551\n"
+            "    \u2551   \u2593\u2588\u2588\u2593            \u2593\u2588\u2588\u2593     \u2551\n"
+            "    \u2551    \u2593\u2588\u2588\u2593\u2591          \u2591\u2593\u2588\u2588\u2593      \u2551\n"
+            "    \u2551     \u2593\u2588\u2588\u2588\u2588\u2593\u2593\u2591\u2591\u2591\u2591\u2591\u2591\u2593\u2593\u2588\u2588\u2588\u2588\u2593       \u2551\n"
+            "    \u2551      \u2591\u2593\u2593\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2593\u2593\u2591        \u2551\n"
+            "    \u2551    \u2593\u2593\u2593\u2591\u2591            \u2591\u2591\u2593\u2593\u2593      \u2551\n"
+            "    \u2551   \u2593\u2591                    \u2591\u2593     \u2551\n"
+            "    \u2551                                        \u2551\n"
+            "    \u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d",
+            className='ascii-art'
+        ),
+
+        # Title
+        html.Div("PARASITE  DETECTION  ARRAY", className='boot-title'),
+
+        # Boot sequence lines
+        html.Div([
+            html.Div("BIOS v2.0 .............. ParAsIte Systems Inc.", className='line',
+                     style={'animationDelay': '0.3s'}),
+            html.Div("MEM CHECK: 3176 PARASITIC POSTS .......... OK", className='line',
+                     style={'animationDelay': '0.7s'}),
+            html.Div("AFFECT PATTERN DB [48 VECTORS] ........... OK", className='line',
+                     style={'animationDelay': '1.1s'}),
+            html.Div("SCANNING REDDIT HIVE MIND ................ OK", className='line',
+                     style={'animationDelay': '1.5s'}),
+            html.Div("RISK FACTOR CORRELATION ENGINE ........... OK", className='line',
+                     style={'animationDelay': '1.9s'}),
+            html.Div("RHETORICAL STRATEGY PROFILES ............. OK", className='line',
+                     style={'animationDelay': '2.3s'}),
+            html.Div("RENDERING VISUALIZATION GRID .............", className='line status-loading',
+                     style={'animationDelay': '2.7s'}),
+        ], className='boot-text'),
+
+        # Progress bar
+        html.Div([
+            html.Div("LOADING:", className='progress-label'),
+            html.Div([
+                html.Span("\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588", className='progress-fill'),
+                html.Span("\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591",
+                          className='boot-dim'),
+            ], className='progress-bar'),
+        ], className='progress-container'),
+
+        # Version tag
+        html.Div("SYS BUILD 2025.06 // COOPER TRETTER // MIT LICENSE", className='boot-version'),
+
+    ], id='loading-overlay', className='loading-overlay'),
+
+    # Store to track chart loading state
+    dcc.Store(id='charts-loaded', data=False),
+
     # Header
     html.Div([
         html.Div([
@@ -1306,8 +1218,21 @@ app.layout = html.Div([
         # Store for selected indicator
         dcc.Store(id='selected-risk-indicator'),
 
-        # Interval to trigger load
-        dcc.Interval(id='correlation-interval', interval=60000, n_intervals=0, max_intervals=1)
+        # Button to trigger correlation load (replaces auto-firing interval)
+        html.Div([
+            html.Button("Load Correlation Analysis", id='load-correlation-btn', n_clicks=0,
+                        style={
+                            'backgroundColor': COLORS['primary'],
+                            'color': COLORS['white'],
+                            'border': 'none',
+                            'borderRadius': '8px',
+                            'padding': '10px 20px',
+                            'fontSize': '13px',
+                            'fontWeight': '500',
+                            'cursor': 'pointer',
+                            'fontFamily': '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                        })
+        ], style={'textAlign': 'center', 'marginTop': '16px'})
 
     ], style={'padding': '20px 32px', 'maxWidth': '1400px', 'margin': '0 auto'}),
 
@@ -1379,6 +1304,26 @@ app.layout = html.Div([
 ], style={'backgroundColor': COLORS['light'], 'minHeight': '100vh',
           'fontFamily': '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'})
 
+# Clientside callback to dismiss loading screen when charts are ready
+app.clientside_callback(
+    """
+    function(chartsLoaded) {
+        if (chartsLoaded) {
+            var overlay = document.getElementById('loading-overlay');
+            if (overlay) {
+                overlay.classList.add('fade-out');
+                setTimeout(function() {
+                    overlay.classList.add('hidden');
+                }, 800);
+            }
+        }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output('loading-overlay', 'className'),
+    Input('charts-loaded', 'data')
+)
+
 
 def filter_dataframe(df, start_date, end_date, subreddits, categories, authors, models):
     """Apply filters to dataframe."""
@@ -1410,7 +1355,8 @@ def filter_dataframe(df, start_date, end_date, subreddits, categories, authors, 
      Output('symbol-chart', 'figure'),
      Output('post-count', 'children'),
      Output('filtered-data', 'data'),
-     Output('excluded-words-display', 'children')],
+     Output('excluded-words-display', 'children'),
+     Output('charts-loaded', 'data')],
     [Input('date-filter', 'start_date'),
      Input('date-filter', 'end_date'),
      Input('subreddit-filter', 'value'),
@@ -1548,7 +1494,7 @@ def update_charts(start_date, end_date, subreddits, categories, authors, models,
         excluded_display = f"Excluding: {'; '.join(excluded_parts)}" if excluded_parts else ""
 
         return (time_fig, sub_fig, cat_fig, author_fig, model_fig, word_fig, symbol_fig,
-                post_count, json.dumps(filtered_ids), excluded_display)
+                post_count, json.dumps(filtered_ids), excluded_display, True)
 
     except Exception as e:
         print(f"ERROR in update_charts: {e}")
@@ -1558,7 +1504,7 @@ def update_charts(start_date, end_date, subreddits, categories, authors, models,
         error_fig.add_annotation(text=f"Error: {str(e)[:50]}", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
         error_fig.update_layout(height=200, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
         return (error_fig, error_fig, error_fig, error_fig, error_fig, error_fig, error_fig,
-                f"Error: {str(e)[:30]}", "[]", "")
+                f"Error: {str(e)[:30]}", "[]", "", True)
 
 
 # Category definitions for display
@@ -1921,7 +1867,7 @@ def add_affect_scores_to_df(df):
 
     # Vectorized scoring for each dimension
     for dim in dimensions:
-        col_name = f'affect_{dim.lower()}'
+        col_name = AFFECT_COL_MAP[dim]
         # Sum matches across all patterns for this dimension
         df[col_name] = 0
         for pattern in AFFECT_PATTERNS[dim]:
@@ -1932,10 +1878,13 @@ def add_affect_scores_to_df(df):
 
     return df
 
-# Add affect scores to global dataframe
-print("Computing affect scores...")
-df_all = add_affect_scores_to_df(df_all)
-print("Affect scores computed.")
+# Add affect scores to global dataframe (skip if pre-computed in DB)
+if 'affect_urgency' in df_all.columns and df_all['affect_urgency'].sum() > 0:
+    print("Affect scores loaded from database (pre-computed).")
+else:
+    print("Computing affect scores in-memory (fallback)...")
+    df_all = add_affect_scores_to_df(df_all)
+    print("Affect scores computed.")
 
 
 @app.callback(
@@ -2001,7 +1950,7 @@ def update_affect_radar(slider_value, start_date, end_date, subreddits, categori
 
     # Use pre-computed affect scores (fast column sums)
     dimensions = list(AFFECT_PATTERNS.keys())
-    totals = {dim: time_filtered[f'affect_{dim.lower()}'].sum() for dim in dimensions}
+    totals = {dim: time_filtered[AFFECT_COL_MAP[dim]].sum() for dim in dimensions}
 
     # Normalize to percentages (relative to max)
     max_val = max(totals.values()) if max(totals.values()) > 0 else 1
@@ -2656,14 +2605,35 @@ def compute_aggregate_correlation():
         return None, None
 
 
+def load_cached_correlation():
+    """Try to load correlation results from cache, fall back to live computation."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM cached_results WHERE key = 'correlation_user_stats'")
+        cached_us = cursor.fetchone()
+        cursor.execute("SELECT value FROM cached_results WHERE key = 'correlation_indicator_data'")
+        cached_ic = cursor.fetchone()
+        conn.close()
+        if cached_us and cached_ic:
+            user_stats = cached_us[0] if isinstance(cached_us[0], dict) or isinstance(cached_us[0], list) else json.loads(cached_us[0])
+            indicator_correlations = cached_ic[0] if isinstance(cached_ic[0], dict) else json.loads(cached_ic[0])
+            print("Correlation loaded from cache.")
+            return user_stats, indicator_correlations
+    except Exception as e:
+        print(f"Cache read failed: {e}")
+    return compute_aggregate_correlation()
+
+
 @app.callback(
     [Output('aggregate-correlation-chart', 'figure'),
      Output('correlation-summary', 'children')],
-    Input('correlation-interval', 'n_intervals')
+    Input('load-correlation-btn', 'n_clicks'),
+    prevent_initial_call=True
 )
-def update_correlation_analysis(_):
+def update_correlation_analysis(n_clicks):
     """Update the aggregate correlation chart and summary."""
-    user_stats, indicator_correlations = compute_aggregate_correlation()
+    user_stats, indicator_correlations = load_cached_correlation()
 
     if not user_stats or not indicator_correlations:
         empty_fig = go.Figure()

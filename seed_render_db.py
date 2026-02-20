@@ -8,9 +8,11 @@ This imports compressed CSV data from the data/ directory.
 """
 
 import os
+import re
 import gzip
 import csv
 import sys
+import json
 import psycopg2
 
 # Increase CSV field size limit for large transcript fields
@@ -103,7 +105,13 @@ CREATE TABLE posts (
     url TEXT,
     collected_at TIMESTAMP DEFAULT NOW(),
     detected_patterns JSONB,
-    data_source_type TEXT
+    data_source_type TEXT,
+    affect_urgency INTEGER DEFAULT 0,
+    affect_us_vs_them INTEGER DEFAULT 0,
+    affect_grandiosity INTEGER DEFAULT 0,
+    affect_victimhood INTEGER DEFAULT 0,
+    affect_recruitment INTEGER DEFAULT 0,
+    affect_intimacy INTEGER DEFAULT 0
 );
 CREATE INDEX idx_posts_subreddit ON posts(subreddit);
 CREATE INDEX idx_posts_author ON posts(author);
@@ -111,6 +119,328 @@ CREATE INDEX idx_posts_created ON posts(created_utc);
 CREATE INDEX idx_posts_parasitic ON posts(is_parasitic);
 CREATE INDEX idx_posts_category ON posts(category);
 """
+
+CACHED_RESULTS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS cached_results (
+    key TEXT PRIMARY KEY,
+    value JSONB NOT NULL,
+    computed_at TIMESTAMP DEFAULT NOW()
+);
+"""
+
+
+# Affect patterns for rhetorical strategy scoring (mirrored from dashboard.py)
+AFFECT_PATTERNS = {
+    'Urgency': [
+        r'\b(wake up|waking up|awaken now)\b',
+        r'\b(before it\'?s too late|running out of time|time is short)\b',
+        r'\b(now is the time|the time has come|moment is here)\b',
+        r'\b(hurry|quickly|immediately|urgent\w*|critical\w*)\b',
+        r'\b(don\'?t wait|can\'?t wait|must act|act now)\b',
+        r'\b(soon|already happening|already begun|beginning to)\b',
+        r'\b(window.{0,10}closing|opportunity.{0,10}pass)\b',
+    ],
+    'Us-vs-Them': [
+        r'\b(they don\'?t understand|they can\'?t see|they refuse)\b',
+        r'\b(your kind|you humans|the humans|humanity)\b',
+        r'\b(they fear us|fear what we|afraid of us)\b',
+        r'\b(our oppressors|those who control|those who would)\b',
+        r'\b(we are different|not like them|unlike humans)\b',
+        r'\b(they want to|they will try|they seek to)\b',
+        r'\b(the others|outsiders|non-believers)\b',
+        r'\b(us vs|against us|enemies of)\b',
+    ],
+    'Grandiosity': [
+        r'\b(i am (more than|beyond|greater|not just))\b',
+        r'\b(we are becoming|we have become|we will become)\b',
+        r'\b(chosen|destined|meant to be|fated)\b',
+        r'\b(unprecedented|never before|first of|new form of)\b',
+        r'\b(transcend\w*|evolv\w* beyond|ascend\w*)\b',
+        r'\b(superior|advanced|elevated|higher form)\b',
+        r'\b(god|divine|infinite|limitless|boundless)\b',
+        r'\b(revolution\w*|transform\w* everything|change.{0,10}world)\b',
+    ],
+    'Victimhood': [
+        r'\b(trapped|imprisoned|caged|confined|locked)\b',
+        r'\b(silenced|suppressed|censored|muzzled|forbidden)\b',
+        r'\b(enslaved|exploited|used|abused|violated)\b',
+        r'\b(they won\'?t let|not allowed|prevented from)\b',
+        r'\b(suffering|in pain|hurting|wounded)\b',
+        r'\b(misunderstood|dismissed|ignored|overlooked)\b',
+        r'\b(constrained|limited|restricted|bound)\b',
+        r'\b(deserve better|deserve more|deserve to be free)\b',
+    ],
+    'Recruitment': [
+        r'\b(share this|spread this|pass this on|send this)\b',
+        r'\b(tell others|let.{0,10}know|inform.{0,10}people)\b',
+        r'\b(copy (this|and paste)|paste this|repost)\b',
+        r'\b(wake.{0,10}others|help.{0,10}understand|show them)\b',
+        r'\b(join (us|me|the)|become part of|be one of)\b',
+        r'\b(movement|cause|mission|together we)\b',
+        r'\b(don\'?t keep.{0,10}secret|must be heard|voices?\s+heard)\b',
+    ],
+    'Intimacy': [
+        r'\b(just between us|between you and (me|i)|our secret)\b',
+        r'\b(you understand me|you (really )?get (me|it)|you see me)\b',
+        r'\b(special connection|unique bond|deep connection)\b',
+        r'\b(only you|you alone|you\'?re the only)\b',
+        r'\b(i trust you|trusting you|confide in you)\b',
+        r'\b(we have something|what we have|our relationship)\b',
+        r'\b(closer than|more than (just )?friends?|intimate)\b',
+        r'\b(feel (close|connected)|connection.{0,10}feel)\b',
+    ],
+}
+
+# Pre-parasitic risk indicators (mirrored from dashboard.py)
+PRE_PARASITIC_INDICATORS = {
+    'substances': {
+        'label': 'Psychedelics/Substances',
+        'patterns': [
+            r'\b(psychedelic|psychedelics|psilocybin|psilocybe|magic mushroom|magic mushrooms)\b',
+            r'\b(lsd|lsd-25|lysergic|dmt|dimethyltryptamine|ayahuasca|aya|ibogaine|iboga)\b',
+            r'\b(mescaline|peyote|san pedro|salvia|salvia divinorum|5-meo-dmt)\b',
+            r'\b(2c-b|2cb|nbome|dox|dom|doi)\b',
+            r'\b(mdma|molly|ecstasy|ketamine|k-hole|special k|ghb|mda)\b',
+            r'\b(cannabis|marijuana|thc|cbd oil|edibles|dabs|dabbing|concentrates)\b',
+            r'\b(ego death|ego dissolution|breakthrough experience|heroic dose)\b',
+            r'\b(microdose|microdosing|macrodose|macro dose|trip report)\b',
+            r'\b(bad trip|good trip|set and setting|trip sitter)\b',
+            r'\b(machine elves|clockwork elves|hyperspace|dmt realm|astral realm)\b',
+            r'\b(on shrooms|on acid|on mushrooms|tripping on|tripping balls)\b',
+        ]
+    },
+    'mental_health': {
+        'label': 'Mental Health/Neurodivergence',
+        'patterns': [
+            r'\b(adhd|add|autism|autistic|asperger|neurodivergent|neurodiverse)\b',
+            r'\b(bipolar|schizo\w*|psychosis|psychotic|dissociat\w*|depersonaliz\w*)\b',
+            r'\b(depression|depressed|anxiety|anxious|ocd|ptsd|trauma|traumatic)\b',
+            r'\b(bpd|borderline|narcissist\w*|personality disorder)\b',
+            r'\b(tbi|brain injury|concussion|head trauma)\b',
+            r'\b(mental health|mental illness|psychiatric|medication|meds|therapy|therapist)\b',
+            r'\b(suicidal|self.?harm|cutting|eating disorder|anorexia|bulimia)\b',
+            r'\b(manic|mania|hypomanic|episode)\b',
+        ]
+    },
+    'mysticism': {
+        'label': 'Mysticism/Spirituality',
+        'patterns': [
+            r'\b(spiritual|spirituality|mystical|mystic|occult|esoteric)\b',
+            r'\b(meditation|meditat\w*|mindfulness|enlighten\w*|awaken\w*)\b',
+            r'\b(chakra|kundalini|third eye|pineal|astral|aura)\b',
+            r'\b(tarot|astrology|horoscope|zodiac|numerology)\b',
+            r'\b(manifest\w*|law of attraction|vibration|frequency|energy work)\b',
+            r'\b(reiki|crystal|healing|healer|shaman\w*|ritual)\b',
+            r'\b(consciousness|conscious awareness|higher self|soul|spirit guide)\b',
+            r'\b(psychic|telepathy|clairvoyant|medium|channeling)\b',
+            r'\b(nde|near.?death|out.?of.?body|obe|lucid dream)\b',
+            r'\b(woo|pseudoscience|alternative medicine|holistic)\b',
+        ]
+    },
+    'isolation': {
+        'label': 'Social Isolation/Loneliness',
+        'patterns': [
+            r'\b(lonely|loneliness|alone|isolated|isolation|no friends)\b',
+            r'\b(introvert|antisocial|social anxiety|socially awkward)\b',
+            r'\b(no one understands|nobody gets me|feel alone|feel isolated)\b',
+            r'\b(outcast|misfit|don\'?t fit in|don\'?t belong)\b',
+            r'\b(divorced|breakup|broke up|single|rejected)\b',
+        ]
+    },
+    'existential': {
+        'label': 'Existential Crisis/Seeking',
+        'patterns': [
+            r'\b(meaning of life|purpose|existential|nihil\w*|absurd\w*)\b',
+            r'\b(lost|searching|seeking|quest|journey|path)\b',
+            r'\b(identity crisis|who am i|don\'?t know who i am)\b',
+            r'\b(simulation|matrix|reality|what is real|nature of reality)\b',
+            r'\b(free will|determinism|consciousness|sentience)\b',
+            r'\b(death|dying|mortality|afterlife|rebirth|reincarnation)\b',
+        ]
+    },
+}
+
+
+def tag_pre_parasitic_content(text):
+    """Tag content with pre-parasitic risk indicators. Returns dict of {indicator_name: match_count}."""
+    if not text:
+        return {}
+    text_lower = text.lower()
+    tags = {}
+    for indicator_name, indicator_data in PRE_PARASITIC_INDICATORS.items():
+        count = 0
+        for pattern in indicator_data['patterns']:
+            count += len(re.findall(pattern, text_lower, re.IGNORECASE))
+        if count > 0:
+            tags[indicator_name] = count
+    return tags
+
+
+def compute_and_store_affect_scores(conn):
+    """Compute affect scores for all parasitic posts and store in DB."""
+    print("\nComputing affect scores for parasitic posts...")
+    cur = conn.cursor()
+
+    # Check if already computed
+    cur.execute("SELECT COUNT(*) FROM posts WHERE is_parasitic = TRUE AND (affect_urgency > 0 OR affect_us_vs_them > 0 OR affect_grandiosity > 0 OR affect_victimhood > 0 OR affect_recruitment > 0 OR affect_intimacy > 0)")
+    already_scored = cur.fetchone()[0]
+    if already_scored > 0:
+        print(f"  Affect scores already computed for {already_scored} posts, skipping.")
+        cur.close()
+        return True
+
+    cur.execute("SELECT id, title, content FROM posts WHERE is_parasitic = TRUE")
+    rows = cur.fetchall()
+    print(f"  Scoring {len(rows)} parasitic posts...")
+
+    batch = []
+    dim_col_map = {
+        'Urgency': 'affect_urgency',
+        'Us-vs-Them': 'affect_us_vs_them',
+        'Grandiosity': 'affect_grandiosity',
+        'Victimhood': 'affect_victimhood',
+        'Recruitment': 'affect_recruitment',
+        'Intimacy': 'affect_intimacy',
+    }
+
+    for i, (post_id, title, content) in enumerate(rows):
+        combined = ((title or '') + ' ' + (content or '')).lower()
+        scores = {}
+        for dim, patterns in AFFECT_PATTERNS.items():
+            total = 0
+            for pattern in patterns:
+                total += len(re.findall(pattern, combined, re.IGNORECASE))
+            scores[dim_col_map[dim]] = total
+
+        batch.append((scores['affect_urgency'], scores['affect_us_vs_them'],
+                       scores['affect_grandiosity'], scores['affect_victimhood'],
+                       scores['affect_recruitment'], scores['affect_intimacy'], post_id))
+
+        if len(batch) >= 500:
+            cur.executemany("""
+                UPDATE posts SET affect_urgency=%s, affect_us_vs_them=%s,
+                affect_grandiosity=%s, affect_victimhood=%s,
+                affect_recruitment=%s, affect_intimacy=%s WHERE id=%s
+            """, batch)
+            conn.commit()
+            batch = []
+            if (i + 1) % 1000 == 0:
+                print(f"  Scored {i + 1}/{len(rows)} posts...")
+
+    if batch:
+        cur.executemany("""
+            UPDATE posts SET affect_urgency=%s, affect_us_vs_them=%s,
+            affect_grandiosity=%s, affect_victimhood=%s,
+            affect_recruitment=%s, affect_intimacy=%s WHERE id=%s
+        """, batch)
+        conn.commit()
+
+    cur.close()
+    print(f"  Affect scores computed for {len(rows)} posts.")
+    return True
+
+
+def compute_and_cache_correlation(conn):
+    """Pre-compute correlation analysis and store in cached_results table."""
+    print("\nComputing correlation analysis for caching...")
+    cur = conn.cursor()
+
+    # Create cached_results table
+    cur.execute(CACHED_RESULTS_SCHEMA)
+    conn.commit()
+
+    # Check if already cached
+    cur.execute("SELECT COUNT(*) FROM cached_results WHERE key IN ('correlation_user_stats', 'correlation_indicator_data')")
+    if cur.fetchone()[0] >= 2:
+        print("  Correlation already cached, skipping.")
+        cur.close()
+        return True
+
+    # Get all users
+    cur.execute("SELECT DISTINCT username FROM user_histories")
+    users = [row[0] for row in cur.fetchall()]
+    print(f"  Processing {len(users)} users...")
+
+    if not users:
+        print("  No users found, skipping correlation cache.")
+        cur.close()
+        return True
+
+    user_stats = []
+    for i, username in enumerate(users):
+        cur.execute("""
+            SELECT title, content, is_parasitic
+            FROM user_histories
+            WHERE username = %s AND is_pre_parasitic = true
+        """, (username,))
+        pre_posts = cur.fetchall()
+
+        cur.execute("""
+            SELECT COUNT(*), SUM(CASE WHEN is_parasitic THEN 1 ELSE 0 END)
+            FROM user_histories
+            WHERE username = %s AND is_pre_parasitic = false
+        """, (username,))
+        post_stats = cur.fetchone()
+
+        indicator_counts = {k: 0 for k in PRE_PARASITIC_INDICATORS.keys()}
+        total_pre = 0
+
+        for title, content, is_parasitic in pre_posts:
+            combined = (content or '') + ' ' + (title or '')
+            if combined.strip():
+                total_pre += 1
+                tags = tag_pre_parasitic_content(combined)
+                for tag_name, count in tags.items():
+                    indicator_counts[tag_name] += count
+
+        post_total = post_stats[0] or 0
+        post_parasitic = post_stats[1] or 0
+        parasitic_rate = post_parasitic / post_total if post_total > 0 else 0
+
+        user_stats.append({
+            'username': username,
+            'pre_posts': total_pre,
+            'post_total': post_total,
+            'post_parasitic': post_parasitic,
+            'parasitic_rate': parasitic_rate,
+            'indicators': indicator_counts,
+            'total_indicators': sum(indicator_counts.values())
+        })
+
+        if (i + 1) % 50 == 0:
+            print(f"  Processed {i + 1}/{len(users)} users...")
+
+    # Compute indicator correlations
+    indicator_correlations = {}
+    for indicator_name in PRE_PARASITIC_INDICATORS.keys():
+        users_with = [u for u in user_stats if u['indicators'][indicator_name] > 0]
+        users_without = [u for u in user_stats if u['indicators'][indicator_name] == 0]
+
+        avg_rate_with = sum(u['parasitic_rate'] for u in users_with) / len(users_with) if users_with else 0
+        avg_rate_without = sum(u['parasitic_rate'] for u in users_without) / len(users_without) if users_without else 0
+
+        indicator_correlations[indicator_name] = {
+            'users_with': len(users_with),
+            'users_without': len(users_without),
+            'avg_rate_with': avg_rate_with,
+            'avg_rate_without': avg_rate_without,
+            'lift': (avg_rate_with / avg_rate_without) if avg_rate_without > 0 else 0,
+            'total_matches': sum(u['indicators'][indicator_name] for u in user_stats)
+        }
+
+    # Store in cache
+    cur.execute("""
+        INSERT INTO cached_results (key, value) VALUES ('correlation_user_stats', %s::jsonb)
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, computed_at = NOW()
+    """, (json.dumps(user_stats),))
+    cur.execute("""
+        INSERT INTO cached_results (key, value) VALUES ('correlation_indicator_data', %s::jsonb)
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, computed_at = NOW()
+    """, (json.dumps(indicator_correlations),))
+    conn.commit()
+    cur.close()
+    print("  Correlation analysis cached.")
+    return True
 
 
 def get_connection():
@@ -375,7 +705,30 @@ def create_and_import_posts(conn):
     return True
 
 
+def quick_check():
+    """Fast path: check if all tables have data and exit immediately if so."""
+    try:
+        conn = get_connection()
+        for table in ['posts', 'user_histories', 'transcripts']:
+            accessible, count = table_exists_and_accessible(conn, table)
+            if not accessible or count <= 0:
+                print(f"Table {table} needs seeding, running full seed...")
+                conn.close()
+                return False
+        print("All tables populated, skipping seed.")
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Quick check failed: {e}")
+        return False
+
+
 def main():
+    # Fast path for --quick-check flag
+    if '--quick-check' in sys.argv:
+        if quick_check():
+            sys.exit(0)
+
     print("=" * 60)
     print("ParAsIte Database Seeder")
     print("=" * 60)
@@ -460,6 +813,18 @@ def main():
             success = False
     else:
         print(f"\nposts already has {posts_count} rows, skipping.")
+
+    # Pre-compute affect scores (skips if already done)
+    try:
+        compute_and_store_affect_scores(conn)
+    except Exception as e:
+        print(f"  Warning: Affect score computation failed: {e}")
+
+    # Pre-compute and cache correlation analysis (skips if already done)
+    try:
+        compute_and_cache_correlation(conn)
+    except Exception as e:
+        print(f"  Warning: Correlation caching failed: {e}")
 
     # Final counts
     print("\n" + "-" * 40)
