@@ -661,7 +661,11 @@ def stat_card(title, value, subtitle=None):
 
 
 # Initialize Dash app
-app = dash.Dash(__name__, suppress_callback_exceptions=True)
+app = dash.Dash(
+    __name__,
+    suppress_callback_exceptions=True,
+    meta_tags=[{'name': 'viewport', 'content': 'width=device-width, initial-scale=1.0'}]
+)
 app.title = "Parasitic AI Dashboard"
 server = app.server  # Expose for gunicorn
 
@@ -762,30 +766,26 @@ app.layout = html.Div([
 
         # Boot sequence lines
         html.Div([
-            html.Div("BIOS v2.0 .............. ParAsIte Systems Inc.", className='line',
-                     style={'animationDelay': '0.3s'}),
-            html.Div("MEM CHECK: 3176 PARASITIC POSTS .......... OK", className='line',
-                     style={'animationDelay': '0.7s'}),
-            html.Div("AFFECT PATTERN DB [48 VECTORS] ........... OK", className='line',
-                     style={'animationDelay': '1.1s'}),
-            html.Div("SCANNING REDDIT HIVE MIND ................ OK", className='line',
+            html.Div("BIOS v2.0 .............. ParAsIte Systems", className='line',
+                     style={'animationDelay': '0.4s'}),
+            html.Div("MEM CHECK: 3176 PARASITIC POSTS ....... OK", className='line',
+                     style={'animationDelay': '0.9s'}),
+            html.Div("AFFECT PATTERN DB [48 VECTORS] ........ OK", className='line',
                      style={'animationDelay': '1.5s'}),
-            html.Div("RISK FACTOR CORRELATION ENGINE ........... OK", className='line',
-                     style={'animationDelay': '1.9s'}),
-            html.Div("RHETORICAL STRATEGY PROFILES ............. OK", className='line',
-                     style={'animationDelay': '2.3s'}),
-            html.Div("RENDERING VISUALIZATION GRID .............", className='line status-loading',
-                     style={'animationDelay': '2.7s'}),
+            html.Div("SCANNING REDDIT HIVE MIND ............. OK", className='line',
+                     style={'animationDelay': '2.1s'}),
+            html.Div("RISK FACTOR CORRELATION ENGINE ........ OK", className='line',
+                     style={'animationDelay': '2.8s'}),
+            html.Div("RHETORICAL STRATEGY PROFILES .......... OK", className='line',
+                     style={'animationDelay': '3.5s'}),
+            html.Div("RENDERING VISUALIZATION GRID ..........", className='line status-loading',
+                     style={'animationDelay': '4.2s'}),
         ], className='boot-text'),
 
-        # Progress bar
+        # Progress bar — single div that fills via stepped keyframes synced to boot lines
         html.Div([
             html.Div("LOADING:", className='progress-label'),
-            html.Div([
-                html.Span("\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588", className='progress-fill'),
-                html.Span("\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591",
-                          className='boot-dim'),
-            ], className='progress-bar'),
+            html.Div(className='progress-track'),
         ], className='progress-container'),
 
         # Version tag
@@ -1309,9 +1309,15 @@ app.clientside_callback(
     """
     function(chartsLoaded) {
         if (chartsLoaded) {
-            // Wait for Plotly to finish rendering charts before fading out
-            requestAnimationFrame(function() {
-                setTimeout(function() {
+            // Enforce minimum display time so boot sequence plays out fully
+            // Boot lines end at 4.2s + 0.15s type-in = ~4.35s
+            var minDisplayMs = 5000;
+            var pageLoadTime = window.__parasiteLoadStart || Date.now();
+            var elapsed = Date.now() - pageLoadTime;
+            var remaining = Math.max(0, minDisplayMs - elapsed);
+
+            setTimeout(function() {
+                requestAnimationFrame(function() {
                     var overlay = document.getElementById('loading-overlay');
                     if (overlay) {
                         overlay.classList.add('fade-out');
@@ -1319,8 +1325,12 @@ app.clientside_callback(
                             overlay.classList.add('hidden');
                         }, 800);
                     }
-                }, 600);
-            });
+                });
+            }, remaining + 600);
+        }
+        // Record page load start on first call
+        if (!window.__parasiteLoadStart) {
+            window.__parasiteLoadStart = Date.now();
         }
         return window.dash_clientside.no_update;
     }

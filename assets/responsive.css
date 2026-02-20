@@ -1,0 +1,40 @@
+/* ============================================================
+   Dashboard Mobile Responsiveness
+   ============================================================ */
+
+@media (max-width: 768px) {
+    /* Tighter padding on mobile */
+    .dash-graph {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    /* Let flex children stack vertically */
+    div[style*="display: flex"][style*="gap"] {
+        flex-direction: column !important;
+    }
+
+    /* Reduce section padding */
+    div[style*="padding: 20px 32px"] {
+        padding: 12px 16px !important;
+    }
+
+    /* Constrain max-width containers */
+    div[style*="maxWidth: 1400px"] {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    /* Even tighter on small phones */
+    div[style*="padding: 20px 32px"] {
+        padding: 8px 10px !important;
+    }
+
+    /* Smaller chart heights */
+    .js-plotly-plot {
+        max-width: 100%;
+        overflow: hidden;
+    }
+}
