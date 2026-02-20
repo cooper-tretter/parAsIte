@@ -1304,33 +1304,52 @@ app.layout = html.Div([
 ], style={'backgroundColor': COLORS['light'], 'minHeight': '100vh',
           'fontFamily': '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'})
 
-# Clientside callback to dismiss loading screen when charts are ready
+# Clientside callback to dismiss loading screen when charts are ACTUALLY rendered
 app.clientside_callback(
     """
     function(chartsLoaded) {
+        if (!window.__parasiteLoadStart) {
+            window.__parasiteLoadStart = Date.now();
+        }
         if (chartsLoaded) {
-            // Enforce minimum display time so boot sequence plays out fully
-            // Boot lines end at 4.2s + 0.15s type-in = ~4.35s
+            // Poll the DOM until Plotly SVGs are actually painted
+            function chartsActuallyRendered() {
+                var svgs = document.querySelectorAll('.js-plotly-plot .plot-container');
+                return svgs.length >= 3;
+            }
+
+            function dismiss() {
+                var overlay = document.getElementById('loading-overlay');
+                if (overlay && !overlay.classList.contains('fade-out')) {
+                    overlay.classList.add('fade-out');
+                    setTimeout(function() {
+                        overlay.classList.add('hidden');
+                    }, 800);
+                }
+            }
+
+            // Min display time so boot sequence plays out (last line at 4.2s)
             var minDisplayMs = 5000;
-            var pageLoadTime = window.__parasiteLoadStart || Date.now();
-            var elapsed = Date.now() - pageLoadTime;
+            var elapsed = Date.now() - window.__parasiteLoadStart;
             var remaining = Math.max(0, minDisplayMs - elapsed);
 
             setTimeout(function() {
-                requestAnimationFrame(function() {
-                    var overlay = document.getElementById('loading-overlay');
-                    if (overlay) {
-                        overlay.classList.add('fade-out');
-                        setTimeout(function() {
-                            overlay.classList.add('hidden');
-                        }, 800);
+                // Now poll until charts are actually in the DOM
+                var attempts = 0;
+                var maxAttempts = 50;
+                var poll = setInterval(function() {
+                    attempts++;
+                    if (chartsActuallyRendered() || attempts >= maxAttempts) {
+                        clearInterval(poll);
+                        // One more rAF to ensure paint is complete
+                        requestAnimationFrame(function() {
+                            requestAnimationFrame(function() {
+                                dismiss();
+                            });
+                        });
                     }
-                });
-            }, remaining + 600);
-        }
-        // Record page load start on first call
-        if (!window.__parasiteLoadStart) {
-            window.__parasiteLoadStart = Date.now();
+                }, 200);
+            }, remaining);
         }
         return window.dash_clientside.no_update;
     }
