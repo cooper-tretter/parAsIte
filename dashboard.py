@@ -2662,8 +2662,7 @@ def load_cached_correlation():
 @app.callback(
     [Output('aggregate-correlation-chart', 'figure'),
      Output('correlation-summary', 'children')],
-    Input('load-correlation-btn', 'n_clicks'),
-    prevent_initial_call=True
+    Input('load-correlation-btn', 'n_clicks')
 )
 def update_correlation_analysis(n_clicks):
     """Update the aggregate correlation chart and summary."""
