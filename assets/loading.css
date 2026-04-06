@@ -1,11 +1,11 @@
 /* ============================================================
-   ParAsIte CRT Terminal Loading Screen
-   Ancient papyrus meets cutting-edge detection technology
+   ParAsIte Loading Screen — Analog Maximalism
+   Warm parchment, darkroom safelight glow, percussive type
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=VT323&family=Space+Mono:wght@400;700&family=DM+Serif+Display&display=swap');
 
-/* Full-page overlay — warm papyrus background */
+/* Full-page overlay — warm parchment ground */
 .loading-overlay {
     position: fixed;
     top: 0;
@@ -13,14 +13,14 @@
     width: 100%;
     height: 100%;
     z-index: 9999;
-    background-color: #f5f0e6;
+    background-color: #1c1917;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    font-family: 'VT323', 'Courier New', monospace;
-    color: #4338ca;
-    transition: opacity 0.8s ease-out;
+    font-family: 'Space Mono', 'VT323', 'Courier New', monospace;
+    color: #F5F0E8;
+    transition: opacity 0.2s ease-out;
     overflow: hidden;
 }
 
@@ -33,7 +33,7 @@
     display: none;
 }
 
-/* Subtle scan lines — lighter for cream background */
+/* Scan lines — visible on dark background */
 .loading-overlay::before {
     content: '';
     position: absolute;
@@ -43,16 +43,16 @@
     bottom: 0;
     background: repeating-linear-gradient(
         0deg,
-        rgba(120, 100, 70, 0.04) 0px,
-        rgba(120, 100, 70, 0.04) 1px,
+        rgba(245, 240, 232, 0.03) 0px,
+        rgba(245, 240, 232, 0.03) 1px,
         transparent 1px,
-        transparent 2px
+        transparent 3px
     );
     pointer-events: none;
     z-index: 10;
 }
 
-/* Warm flicker — like old parchment under lamplight */
+/* Warm flicker — darkroom safelight pulse */
 .loading-overlay::after {
     content: '';
     position: absolute;
@@ -60,7 +60,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(99, 102, 241, 0.01);
+    background: rgba(194, 65, 12, 0.02);
     animation: crt-flicker 0.1s infinite;
     pointer-events: none;
     z-index: 11;
@@ -82,49 +82,49 @@
     100% { opacity: 0.92; }
 }
 
-/* Vignette — aged parchment darkened at edges */
+/* Vignette — dark edges, warm center glow */
 .crt-vignette {
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: radial-gradient(ellipse at center, transparent 45%, rgba(180, 160, 120, 0.25) 80%, rgba(100, 80, 50, 0.35) 100%);
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, 0.4) 80%, rgba(0, 0, 0, 0.6) 100%);
     pointer-events: none;
     z-index: 12;
 }
 
-/* ASCII art — deep indigo on papyrus */
+/* ASCII art — safelight orange glow on dark */
 .ascii-art {
     font-family: 'VT323', 'Courier New', monospace;
     font-size: 14px;
     line-height: 1.15;
-    color: #6366f1;
+    color: #c2410c;
     margin-bottom: 24px;
     position: relative;
     z-index: 5;
     white-space: pre;
     text-align: center;
-    text-shadow: 0 0 12px rgba(99, 102, 241, 0.25);
+    text-shadow: 0 0 12px rgba(194, 65, 12, 0.4);
     animation: glow-pulse 2s ease-in-out infinite;
 }
 
 @keyframes glow-pulse {
-    0%, 100% { text-shadow: 0 0 12px rgba(99, 102, 241, 0.25); }
-    50% { text-shadow: 0 0 20px rgba(139, 92, 246, 0.35), 0 0 40px rgba(99, 102, 241, 0.12); }
+    0%, 100% { text-shadow: 0 0 12px rgba(194, 65, 12, 0.4); }
+    50% { text-shadow: 0 0 24px rgba(194, 65, 12, 0.6), 0 0 48px rgba(194, 65, 12, 0.15); }
 }
 
-/* Title text — deep purple, etched */
+/* Title text — cream on dark, serif display */
 .boot-title {
-    font-family: 'Press Start 2P', 'VT323', monospace;
-    font-size: 14px;
-    color: #4338ca;
+    font-family: 'DM Serif Display', 'VT323', serif;
+    font-size: 18px;
+    color: #F5F0E8;
     text-align: center;
     margin-bottom: 32px;
     position: relative;
     z-index: 5;
-    letter-spacing: 4px;
-    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5), 0 0 12px rgba(99, 102, 241, 0.2);
+    letter-spacing: 6px;
+    text-transform: uppercase;
 }
 
 /* Boot sequence text container */
@@ -139,14 +139,15 @@
 }
 
 .boot-text .line {
-    font-size: 16px;
+    font-size: 14px;
     line-height: 1.9;
     opacity: 0;
     animation: type-in 0.15s forwards;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    text-shadow: 0 0 6px rgba(99, 102, 241, 0.15);
+    color: #F5F0E8;
+    letter-spacing: 0.5px;
 }
 
 @keyframes type-in {
@@ -160,17 +161,17 @@
     }
 }
 
-/* Status colors */
+/* Status colors — analog palette */
 .status-ok {
-    color: #10b981;
+    color: #4d7c0f;
 }
 
 .status-warn {
-    color: #f59e0b;
+    color: #b45309;
 }
 
 .status-loading {
-    color: #8b5cf6;
+    color: #c2410c;
     animation: blink-text 0.8s infinite;
 }
 
@@ -179,7 +180,7 @@
     50%, 100% { opacity: 0.3; }
 }
 
-/* Progress bar container — aligned with boot text */
+/* Progress bar container */
 .progress-container {
     position: relative;
     z-index: 5;
@@ -191,19 +192,22 @@
 }
 
 .progress-label {
-    font-size: 14px;
-    color: #6366f1;
+    font-size: 12px;
+    color: #a8a29e;
     margin-bottom: 6px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
 }
 
-/* Single-element progress bar with stepped fill synced to boot lines */
+/* Progress bar — darkroom orange fill */
 .progress-track {
     width: 100%;
     height: 18px;
-    background-color: #e8e2d6;
-    border-radius: 2px;
+    background-color: #292524;
+    border-radius: 0;
     position: relative;
     overflow: hidden;
+    border: 2px solid #57534e;
 }
 
 .progress-track::after {
@@ -213,20 +217,13 @@
     left: 0;
     height: 100%;
     width: 0%;
-    background: linear-gradient(90deg, #6366f1, #8b5cf6);
-    border-radius: 2px;
-    box-shadow: 0 0 8px rgba(99, 102, 241, 0.3);
+    background: linear-gradient(90deg, #c2410c, #b45309);
+    border-radius: 0;
+    box-shadow: 0 0 12px rgba(194, 65, 12, 0.4);
     animation: stepped-fill 4.8s ease-out forwards;
 }
 
-/* Steps synced to boot line delays:
-   Line 1: 0.4s  → 14%
-   Line 2: 0.9s  → 28%
-   Line 3: 1.5s  → 42%
-   Line 4: 2.1s  → 57%
-   Line 5: 2.8s  → 71%
-   Line 6: 3.5s  → 85%
-   Line 7: 4.2s  → 95% (stays here — loading) */
+/* Steps synced to boot line delays */
 @keyframes stepped-fill {
     0%   { width: 0%; }
     8%   { width: 0%; }
@@ -250,8 +247,8 @@
 .cursor {
     display: inline-block;
     animation: blink-cursor 0.7s infinite;
-    color: #4338ca;
-    text-shadow: 0 0 6px rgba(99, 102, 241, 0.3);
+    color: #c2410c;
+    text-shadow: 0 0 6px rgba(194, 65, 12, 0.4);
 }
 
 @keyframes blink-cursor {
@@ -259,20 +256,21 @@
     50%, 100% { opacity: 0; }
 }
 
-/* Dim secondary text — faded ink on parchment */
+/* Dim secondary text */
 .boot-dim {
-    color: #d6cfc3;
+    color: #57534e;
 }
 
-/* Version tag — like faded marginalia */
+/* Version tag — faded, uppercase lockup */
 .boot-version {
-    font-size: 12px;
-    color: #a8a29e;
+    font-size: 10px;
+    color: #57534e;
     text-align: center;
     margin-top: 24px;
     position: relative;
     z-index: 5;
-    letter-spacing: 1px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
 }
 
 /* ============================================================
@@ -280,46 +278,41 @@
    ============================================================ */
 
 @media (max-width: 600px) {
-    /* Scale down ASCII art on mobile */
     .ascii-art {
         font-size: 8px;
         line-height: 1.1;
         margin-bottom: 16px;
     }
 
-    /* Smaller title */
     .boot-title {
-        font-size: 10px;
-        letter-spacing: 2px;
+        font-size: 12px;
+        letter-spacing: 3px;
         margin-bottom: 20px;
     }
 
-    /* Smaller boot text */
     .boot-text {
         padding: 0 16px;
     }
 
     .boot-text .line {
-        font-size: 12px;
+        font-size: 11px;
         line-height: 1.8;
     }
 
-    /* Progress container */
     .progress-container {
         padding: 0 16px;
     }
 
     .progress-label {
-        font-size: 12px;
+        font-size: 10px;
     }
 
     .progress-track {
         height: 14px;
     }
 
-    /* Version tag */
     .boot-version {
-        font-size: 10px;
+        font-size: 8px;
     }
 }
 
@@ -329,11 +322,11 @@
     }
 
     .boot-title {
-        font-size: 8px;
-        letter-spacing: 1px;
+        font-size: 10px;
+        letter-spacing: 2px;
     }
 
     .boot-text .line {
-        font-size: 11px;
+        font-size: 10px;
     }
 }
