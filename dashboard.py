@@ -1306,88 +1306,86 @@ app.layout = html.Div([
                           'borderRadius': '2px', 'marginBottom': '20px',
                           'border': f'1px solid {COLORS["border"]}'}),
 
-                # Contact form (using native HTML elements for Formspree compatibility)
+                # Contact form (using Dash components with callback-based Formspree submission)
                 html.Div([
                     card([
-                        html.Form([
+                        html.Div([
                             html.Div([
                                 html.Label("Name", htmlFor='contact-name',
                                           style={'display': 'block', 'fontWeight': '700', 'fontSize': '11px',
                                                  'marginBottom': '6px', 'textTransform': 'uppercase',
                                                  'letterSpacing': '1px'}),
-                                html.Input(name='name', id='contact-name', type='text', placeholder='Your name',
-                                          style={'width': '100%', 'padding': '8px 12px', 'fontSize': '13px',
-                                                 'border': f'1px solid {COLORS["border"]}', 'borderRadius': '2px',
-                                                 'marginBottom': '12px', 'backgroundColor': COLORS['light'],
-                                                 'boxSizing': 'border-box', 'fontFamily': FONT_STACK_BODY})
+                                dcc.Input(id='contact-name', type='text', placeholder='Your name',
+                                         style={'width': '100%', 'padding': '8px 12px', 'fontSize': '13px',
+                                                'border': f'1px solid {COLORS["border"]}', 'borderRadius': '2px',
+                                                'marginBottom': '12px', 'backgroundColor': COLORS['light'],
+                                                'boxSizing': 'border-box', 'fontFamily': FONT_STACK_BODY})
                             ]),
                             html.Div([
                                 html.Label("Email", htmlFor='contact-email',
                                           style={'display': 'block', 'fontWeight': '700', 'fontSize': '11px',
                                                  'marginBottom': '6px', 'textTransform': 'uppercase',
                                                  'letterSpacing': '1px'}),
-                                html.Input(name='email', id='contact-email', type='email', placeholder='your@email.com',
-                                          required=True,
-                                          style={'width': '100%', 'padding': '8px 12px', 'fontSize': '13px',
-                                                 'border': f'1px solid {COLORS["border"]}', 'borderRadius': '2px',
-                                                 'marginBottom': '12px', 'backgroundColor': COLORS['light'],
-                                                 'boxSizing': 'border-box', 'fontFamily': FONT_STACK_BODY})
+                                dcc.Input(id='contact-email', type='email', placeholder='your@email.com',
+                                         style={'width': '100%', 'padding': '8px 12px', 'fontSize': '13px',
+                                                'border': f'1px solid {COLORS["border"]}', 'borderRadius': '2px',
+                                                'marginBottom': '12px', 'backgroundColor': COLORS['light'],
+                                                'boxSizing': 'border-box', 'fontFamily': FONT_STACK_BODY})
                             ]),
                             html.Div([
                                 html.Label("Why are you reaching out?", htmlFor='contact-reason',
                                           style={'display': 'block', 'fontWeight': '700', 'fontSize': '11px',
                                                  'marginBottom': '6px', 'textTransform': 'uppercase',
                                                  'letterSpacing': '1px'}),
-                                html.Select([
-                                    html.Option("Select...", value='', disabled=True, selected=True),
-                                    html.Option("General interest", value='general'),
-                                    html.Option("Research collaboration", value='research'),
-                                    html.Option("Affected by the phenomenon", value='affected'),
-                                    html.Option("Media inquiry", value='media'),
-                                    html.Option("Other", value='other'),
-                                ], name='reason', id='contact-reason',
-                                   style={'width': '100%', 'padding': '8px 12px', 'fontSize': '13px',
-                                          'border': f'1px solid {COLORS["border"]}', 'borderRadius': '2px',
-                                          'backgroundColor': COLORS['light'], 'fontFamily': FONT_STACK_BODY})
+                                dcc.Dropdown(id='contact-reason', placeholder='Select...',
+                                            options=[
+                                                {'label': 'General interest', 'value': 'general'},
+                                                {'label': 'Research collaboration', 'value': 'research'},
+                                                {'label': 'Affected by the phenomenon', 'value': 'affected'},
+                                                {'label': 'Media inquiry', 'value': 'media'},
+                                                {'label': 'Other', 'value': 'other'},
+                                            ],
+                                            style={'fontSize': '13px', 'fontFamily': FONT_STACK_BODY})
                             ], style={'marginBottom': '12px'}),
                             html.Div([
                                 html.Label("Tell me more", htmlFor='contact-message',
                                           style={'display': 'block', 'fontWeight': '700', 'fontSize': '11px',
                                                  'marginBottom': '6px', 'textTransform': 'uppercase',
                                                  'letterSpacing': '1px'}),
-                                html.Textarea(name='message', id='contact-message',
-                                             placeholder='Your message (required)', required=True,
-                                             style={'width': '100%', 'padding': '10px 12px', 'fontSize': '13px',
-                                                    'border': f'1px solid {COLORS["border"]}', 'borderRadius': '2px',
-                                                    'marginBottom': '12px', 'backgroundColor': COLORS['light'],
-                                                    'minHeight': '120px', 'fontFamily': FONT_STACK_BODY,
-                                                    'boxSizing': 'border-box', 'resize': 'vertical'})
+                                dcc.Textarea(id='contact-message',
+                                            placeholder='Your message (required)',
+                                            style={'width': '100%', 'padding': '10px 12px', 'fontSize': '13px',
+                                                   'border': f'1px solid {COLORS["border"]}', 'borderRadius': '2px',
+                                                   'marginBottom': '12px', 'backgroundColor': COLORS['light'],
+                                                   'minHeight': '120px', 'fontFamily': FONT_STACK_BODY,
+                                                   'boxSizing': 'border-box', 'resize': 'vertical'})
                             ]),
                             html.Div([
                                 html.Label("Anything else?", htmlFor='contact-additional',
                                           style={'display': 'block', 'fontWeight': '700', 'fontSize': '11px',
                                                  'marginBottom': '6px', 'textTransform': 'uppercase',
                                                  'letterSpacing': '1px'}),
-                                html.Textarea(name='additional', id='contact-additional',
-                                             placeholder='Additional information (optional)',
-                                             style={'width': '100%', 'padding': '10px 12px', 'fontSize': '13px',
-                                                    'border': f'1px solid {COLORS["border"]}', 'borderRadius': '2px',
-                                                    'marginBottom': '12px', 'backgroundColor': COLORS['light'],
-                                                    'minHeight': '80px', 'fontFamily': FONT_STACK_BODY,
-                                                    'boxSizing': 'border-box', 'resize': 'vertical'})
+                                dcc.Textarea(id='contact-additional',
+                                            placeholder='Additional information (optional)',
+                                            style={'width': '100%', 'padding': '10px 12px', 'fontSize': '13px',
+                                                   'border': f'1px solid {COLORS["border"]}', 'borderRadius': '2px',
+                                                   'marginBottom': '12px', 'backgroundColor': COLORS['light'],
+                                                   'minHeight': '80px', 'fontFamily': FONT_STACK_BODY,
+                                                   'boxSizing': 'border-box', 'resize': 'vertical'})
                             ]),
                             html.Div([
                                 html.P("To activate this form, sign up at formspree.io, create a form, and replace YOUR_FORMSPREE_ID in dashboard.py with your form ID.",
                                       style={'fontSize': '11px', 'color': COLORS['muted'], 'fontStyle': 'italic', 'margin': '0 0 12px 0'})
                             ]),
-                            html.Button("SEND", type='submit',
+                            html.Button("SEND", id='contact-submit', n_clicks=0,
                                        style={'padding': '10px 24px', 'fontSize': '11px', 'fontWeight': '700',
                                               'backgroundColor': COLORS['dark'], 'border': f'1px solid {COLORS["dark"]}',
                                               'borderRadius': '2px', 'cursor': 'pointer',
                                               'color': COLORS['light'], 'letterSpacing': '2px',
                                               'fontFamily': FONT_STACK_BODY,
-                                              'transition': 'all 0.15s ease-out'})
-                        ], action='https://formspree.io/f/YOUR_FORMSPREE_ID', method='POST')
+                                              'transition': 'all 0.15s ease-out'}),
+                            html.Div(id='contact-status', style={'marginTop': '12px'})
+                        ])
                     ])
                 ], style={'maxWidth': '600px', 'margin': '0 auto', 'padding': '0 32px'})
 
@@ -2117,6 +2115,45 @@ def display_user_timeline(username):
         ], style={'borderBottom': f'1px solid {COLORS["border"]}', 'marginBottom': '2px'})
         items.append(item)
     return html.Div(items)
+
+
+@app.callback(
+    Output('contact-status', 'children'),
+    Input('contact-submit', 'n_clicks'),
+    State('contact-name', 'value'),
+    State('contact-email', 'value'),
+    State('contact-reason', 'value'),
+    State('contact-message', 'value'),
+    State('contact-additional', 'value'),
+    prevent_initial_call=True
+)
+def submit_contact_form(n_clicks, name, email, reason, message, additional):
+    """Submit contact form data to Formspree via API."""
+    if not email or not message:
+        return html.P("Please fill in your email and message.",
+                      style={'color': COLORS['danger'], 'fontSize': '13px', 'fontFamily': FONT_STACK_BODY})
+    try:
+        import requests
+        resp = requests.post(
+            'https://formspree.io/f/YOUR_FORMSPREE_ID',
+            json={
+                'name': name or '',
+                'email': email,
+                'reason': reason or '',
+                'message': message,
+                'additional': additional or '',
+            },
+            headers={'Accept': 'application/json'}
+        )
+        if resp.ok:
+            return html.P("Thank you! Your message has been sent.",
+                          style={'color': COLORS['success'], 'fontSize': '13px', 'fontFamily': FONT_STACK_BODY})
+        else:
+            return html.P("Something went wrong. Please try again or email ctretter@ncd.com directly.",
+                          style={'color': COLORS['danger'], 'fontSize': '13px', 'fontFamily': FONT_STACK_BODY})
+    except Exception:
+        return html.P("Error sending message. Please email ctretter@ncd.com directly.",
+                      style={'color': COLORS['danger'], 'fontSize': '13px', 'fontFamily': FONT_STACK_BODY})
 
 
 if __name__ == '__main__':
