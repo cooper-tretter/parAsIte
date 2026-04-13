@@ -38,7 +38,7 @@ COLORS = {
     'light': '#F5F0E8',        # Cream / parchment (analog maximalism ground)
     'white': '#ece5d5',        # Warm card surface — never pure white
     'muted': '#57534e',        # Warm mid-gray (stone-600)
-    'border': '#a8a29e',       # Visible warm border (stone-400) — 2-3px solid
+    'border': '#a8a29e',       # Visible warm border (stone-400) — 1px
     'accent': '#7e22ce',       # Deep university purple (purple-700)
 }
 
@@ -70,26 +70,20 @@ DEFAULT_STOPWORDS = {
 }
 
 # Pre-parasitic risk indicator patterns
-# These identify content that may indicate vulnerability to parasitic content
 PRE_PARASITIC_INDICATORS = {
     'substances': {
         'label': 'Psychedelics/Substances',
         'color': '#8b5cf6',  # Purple
         'patterns': [
-            # Psychedelics - explicit names only
             r'\b(psychedelic|psychedelics|psilocybin|psilocybe|magic mushroom|magic mushrooms)\b',
             r'\b(lsd|lsd-25|lysergic|dmt|dimethyltryptamine|ayahuasca|aya|ibogaine|iboga)\b',
             r'\b(mescaline|peyote|san pedro|salvia|salvia divinorum|5-meo-dmt)\b',
             r'\b(2c-b|2cb|nbome|dox|dom|doi)\b',
-            # MDMA/party drugs
             r'\b(mdma|molly|ecstasy|ketamine|k-hole|special k|ghb|mda)\b',
-            # Cannabis - explicit terms
             r'\b(cannabis|marijuana|thc|cbd oil|edibles|dabs|dabbing|concentrates)\b',
-            # Trip-related
             r'\b(ego death|ego dissolution|breakthrough experience|heroic dose)\b',
             r'\b(microdose|microdosing|macrodose|macro dose|trip report)\b',
             r'\b(bad trip|good trip|set and setting|trip sitter)\b',
-            # Specific experiences
             r'\b(machine elves|clockwork elves|hyperspace|dmt realm|astral realm)\b',
             r'\b(on shrooms|on acid|on mushrooms|tripping on|tripping balls)\b',
         ]
@@ -298,47 +292,6 @@ PARASITIC_HIGHLIGHT_PATTERNS = [
 ]
 
 
-def highlight_transcript_text(transcript_text, is_preview=False):
-    """
-    Parse a transcript and highlight appropriately:
-    - User text: highlight pre-parasitic risk indicators (colored by category)
-    - Assistant text: highlight parasitic patterns (red)
-    Format: ### 👤 User / ### 🤖 Assistant sections.
-    """
-    if not transcript_text:
-        return [transcript_text]
-
-    # Split by section headers
-    parts = re.split(r'(### 👤 User|### 🤖 Assistant)', transcript_text)
-
-    result = []
-    current_is_assistant = False
-
-    for i, part in enumerate(parts):
-        if part == '### 👤 User':
-            current_is_assistant = False
-            result.append(html.Span(part, style={'fontWeight': '600', 'color': COLORS['primary']}))
-        elif part == '### 🤖 Assistant':
-            current_is_assistant = True
-            result.append(html.Span(part, style={'fontWeight': '600', 'color': COLORS['warning']}))
-        elif part.strip():
-            if current_is_assistant:
-                # Highlight parasitic patterns in assistant response (red)
-                highlighted = highlight_parasitic_content(part)
-                result.extend(highlighted)
-            else:
-                # User text - highlight pre-parasitic risk indicators only
-                highlighted = highlight_pre_parasitic_content(part)
-                result.extend(highlighted)
-
-    return result if result else [transcript_text]
-
-
-def highlight_transcript_responses_only(transcript_text):
-    """Wrapper for backward compatibility."""
-    return highlight_transcript_text(transcript_text, is_preview=False)
-
-
 def highlight_parasitic_content(text):
     """
     Highlight parasitic patterns in text with red color.
@@ -396,81 +349,43 @@ def highlight_parasitic_content(text):
     return result
 
 
-def highlight_all_patterns(text, is_pre_parasitic=False):
+def highlight_transcript_text(transcript_text, is_preview=False):
     """
-    Highlight both pre-parasitic (if applicable) and parasitic patterns.
-    Pre-parasitic patterns use their specific colors, parasitic patterns use red.
+    Parse a transcript and highlight appropriately:
+    - User text: highlight pre-parasitic risk indicators (colored by category)
+    - Assistant text: highlight parasitic patterns (red)
+    Format: ### 👤 User / ### 🤖 Assistant sections.
     """
-    if not text:
-        return [text]
+    if not transcript_text:
+        return [transcript_text]
 
-    PARASITIC_COLOR = '#ef4444'
+    # Split by section headers
+    parts = re.split(r'(### 👤 User|### 🤖 Assistant)', transcript_text)
 
-    matches = []
-
-    # Add pre-parasitic matches if applicable
-    if is_pre_parasitic:
-        for indicator_name, indicator_data in PRE_PARASITIC_INDICATORS.items():
-            color = indicator_data['color']
-            for pattern in indicator_data['patterns']:
-                for match in re.finditer(pattern, text, re.IGNORECASE):
-                    matches.append({
-                        'start': match.start(),
-                        'end': match.end(),
-                        'text': match.group(),
-                        'color': color,
-                        'type': 'pre'
-                    })
-
-    # Add parasitic matches
-    for pattern in PARASITIC_HIGHLIGHT_PATTERNS:
-        for match in re.finditer(pattern, text, re.IGNORECASE):
-            matches.append({
-                'start': match.start(),
-                'end': match.end(),
-                'text': match.group(),
-                'color': PARASITIC_COLOR,
-                'type': 'parasitic'
-            })
-
-    if not matches:
-        return [text]
-
-    # Sort and remove overlaps (parasitic takes priority over pre-parasitic)
-    matches.sort(key=lambda x: (x['start'], x['type'] == 'pre', -(x['end'] - x['start'])))
-    non_overlapping = []
-    last_end = 0
-    for m in matches:
-        if m['start'] >= last_end:
-            non_overlapping.append(m)
-            last_end = m['end']
-
-    # Build result
     result = []
-    pos = 0
-    for m in non_overlapping:
-        if m['start'] > pos:
-            result.append(text[pos:m['start']])
-        result.append(html.Span(
-            m['text'],
-            style={
-                'backgroundColor': m['color'],
-                'color': 'white',
-                'padding': '1px 4px',
-                'borderRadius': '1px',
-                'fontWeight': '500'
-            }
-        ))
-        pos = m['end']
+    current_is_assistant = False
 
-    if pos < len(text):
-        result.append(text[pos:])
+    for i, part in enumerate(parts):
+        if part == '### 👤 User':
+            current_is_assistant = False
+            result.append(html.Span(part, style={'fontWeight': '600', 'color': COLORS['primary']}))
+        elif part == '### 🤖 Assistant':
+            current_is_assistant = True
+            result.append(html.Span(part, style={'fontWeight': '600', 'color': COLORS['warning']}))
+        elif part.strip():
+            if current_is_assistant:
+                # Highlight parasitic patterns in assistant response (red)
+                highlighted = highlight_parasitic_content(part)
+                result.extend(highlighted)
+            else:
+                # User text - highlight pre-parasitic risk indicators only
+                highlighted = highlight_pre_parasitic_content(part)
+                result.extend(highlighted)
 
-    return result
+    return result if result else [transcript_text]
 
 
 # Rhetorical strategy patterns for radar chart analysis
-# These measure HOW parasitic content persuades, not WHAT it contains
 AFFECT_PATTERNS = {
     'Urgency': [
         r'\b(wake up|waking up|awaken now)\b',
@@ -601,66 +516,143 @@ def load_data():
     df = pd.read_sql(query, conn)
     conn.close()
 
+    # Parse dates
     df['created_utc'] = pd.to_datetime(df['created_utc'])
-    df['date'] = df['created_utc'].dt.date
-    df['week'] = df['created_utc'].dt.to_period('W').apply(lambda x: x.start_time)
 
     return df
 
 
 def extract_words(texts):
-    """Extract words from texts for frequency analysis."""
-    words = []
-    for text in texts:
-        if text and isinstance(text, str):
-            words.extend(re.findall(r'\b[a-zA-Z]{3,}\b', text.lower()))
+    """Extract and count words from texts."""
+    all_text = ' '.join(str(t) for t in texts if t).lower()
+    words = re.findall(r'\b[a-z]+\b', all_text)
     return words
 
 
 def extract_symbols(texts):
     """Extract Unicode symbols from texts."""
-    symbol_pattern = re.compile(r'[🜀-🜿⊛∞◈⟡✧༄☽☾⚝✺❋⋆✦✴✵✶✷✸✹★☆⭐🌟💫✨🔯🌀💠🔷🔶▲△▼▽◆◇○●◎◉⬡⬢]')
-    symbols = []
-    for text in texts:
-        if text and isinstance(text, str):
-            symbols.extend(symbol_pattern.findall(text))
+    all_text = ' '.join(str(t) for t in texts if t)
+    # Match non-ASCII characters that aren't standard letters/numbers
+    symbols = re.findall(r'[^\x00-\x7F]', all_text)
     return symbols
 
 
 def card(children, padding='20px'):
-    """Create a styled card container — analog maximalism: heavy borders, no smooth shadows."""
-    return html.Div(
-        children,
-        className='am-card',
-        style={
-            'backgroundColor': COLORS['white'],
-            'borderRadius': '2px',
-            'padding': padding,
-            'border': f'2px solid {COLORS["dark"]}',
-        }
-    )
+    """Helper to create a styled card."""
+    return html.Div(children, className='am-card', style={
+        'backgroundColor': COLORS['white'],
+        'borderRadius': '2px',
+        'padding': padding,
+        'border': f'1px solid {COLORS["border"]}',
+        'boxShadow': '0 1px 3px rgba(0,0,0,0.05)'
+    })
 
 
 def stat_card(title, value, subtitle=None):
-    """Create a statistics card — uppercase lockup labels, display-scale values."""
+    """Create a metric tile."""
     return html.Div([
-        html.Div(title, style={'fontSize': '10px', 'color': COLORS['muted'],
-                               'textTransform': 'uppercase', 'letterSpacing': '2px',
-                               'marginBottom': '4px', 'fontFamily': FONT_STACK_BODY,
-                               'fontWeight': '700'}),
-        html.Div(str(value), style={'fontSize': '32px', 'fontWeight': '400',
-                                     'color': COLORS['dark'], 'lineHeight': '1.1',
-                                     'fontFamily': FONT_STACK_DISPLAY}),
-        html.Div(subtitle, style={'fontSize': '11px', 'color': COLORS['muted'],
-                                   'marginTop': '6px', 'fontFamily': FONT_STACK_BODY}) if subtitle else None
+        html.Div(title, style={'fontSize': '10px', 'fontWeight': '700',
+                               'color': COLORS['muted'], 'textTransform': 'uppercase',
+                               'letterSpacing': '2px', 'marginBottom': '6px'}),
+        html.Div(str(value), style={'fontSize': '28px', 'fontWeight': '400',
+                                    'color': COLORS['dark'], 'margin': '0 0 4px 0'}),
+        html.Div(subtitle, style={'fontSize': '11px', 'color': COLORS['muted']}) if subtitle else None
     ], style={
         'backgroundColor': COLORS['white'],
+        'border': f'1px solid {COLORS["border"]}',
         'borderRadius': '2px',
-        'padding': '20px',
-        'border': f'2px solid {COLORS["dark"]}',
-        'flex': '1',
-        'minWidth': '150px'
+        'padding': '16px',
+        'boxShadow': '0 1px 3px rgba(0,0,0,0.05)'
     })
+
+
+def load_transcript_models():
+    """Get unique AI models from transcripts table."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT DISTINCT model FROM transcripts WHERE model IS NOT NULL AND model != '' ORDER BY model")
+        models = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        return models
+    except Exception as e:
+        print(f"Error loading transcript models: {e}")
+        return []
+
+
+def load_transcripts(model_filter=None, limit=50):
+    """Load transcripts from database."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        query = """
+            SELECT id, model, source_type, scenario,
+                   LEFT(transcript, 500) as preview,
+                   parasite_score, LENGTH(transcript) as length,
+                   transcript as full_transcript
+            FROM transcripts WHERE transcript IS NOT NULL AND transcript != ''
+        """
+        params = []
+        if model_filter and model_filter != 'all':
+            query += " AND model = %s"
+            params.append(model_filter)
+        query += " ORDER BY parasite_score DESC NULLS LAST LIMIT %s"
+        params.append(limit)
+        cursor.execute(query, params)
+        results = cursor.fetchall()
+        conn.close()
+        return results
+    except Exception as e:
+        print(f"Error loading transcripts: {e}")
+        return []
+
+
+def load_users_with_history():
+    """Get users who have history data."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT username, COUNT(*) as total,
+                   AVG(parasite_score) as avg_score,
+                   SUM(CASE WHEN is_pre_parasitic THEN 1 ELSE 0 END) as pre_count,
+                   SUM(CASE WHEN is_pre_parasitic = false THEN 1 ELSE 0 END) as post_count
+            FROM user_histories GROUP BY username
+        """)
+        users = cursor.fetchall()
+        conn.close()
+        users.sort(key=lambda x: x[2] if x[2] else 0, reverse=True)
+        return users
+    except Exception as e:
+        print(f"Error loading users: {e}")
+        return []
+
+
+def load_user_timeline(username):
+    """Load timeline data for a specific user."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, created_at, post_type, subreddit, title,
+                   content, parasite_score, is_parasitic, is_pre_parasitic
+            FROM user_histories WHERE username = %s ORDER BY created_at ASC
+        """, (username,))
+        results = cursor.fetchall()
+        if not results:
+            cursor.execute("""
+                SELECT id, created_utc as created_at, 'submission' as post_type, subreddit, title,
+                       content, parasite_score,
+                       CASE WHEN parasite_score >= 0.3 THEN true ELSE false END as is_parasitic,
+                       false as is_pre_parasitic
+                FROM posts WHERE author = %s ORDER BY created_utc ASC
+            """, (username,))
+            results = cursor.fetchall()
+        conn.close()
+        return results
+    except Exception as e:
+        print(f"Error loading user timeline: {e}")
+        return []
 
 
 # Initialize Dash app
@@ -671,47 +663,6 @@ app = dash.Dash(
 )
 app.title = "Parasitic AI Dashboard"
 server = app.server  # Expose for gunicorn
-
-# Debug endpoint to check database state
-@server.route('/debug')
-def debug_database():
-    """Show database table counts and schema info."""
-    import json
-    try:
-        conn = get_db_connection()
-
-        info = {
-            'status': 'connected',
-            'host': os.environ.get('DB_HOST', 'localhost'),
-            'database': os.environ.get('DB_NAME', 'unknown'),
-            'tables': {}
-        }
-
-        # Check each table with separate cursor and proper error handling
-        for table in ['posts', 'user_histories', 'transcripts', 'authors']:
-            try:
-                cursor = conn.cursor()
-                cursor.execute(f"SELECT COUNT(*) FROM {table}")
-                count = cursor.fetchone()[0]
-
-                # Get column names
-                cursor.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table}' ORDER BY ordinal_position")
-                columns = [row[0] for row in cursor.fetchall()]
-                cursor.close()
-
-                info['tables'][table] = {
-                    'count': count,
-                    'columns': columns
-                }
-            except Exception as e:
-                # Rollback to clear aborted transaction state
-                conn.rollback()
-                info['tables'][table] = {'error': str(e)}
-
-        conn.close()
-        return f"<pre>{json.dumps(info, indent=2)}</pre>"
-    except Exception as e:
-        return f"<pre>Database connection error: {e}</pre>"
 
 # Load initial data
 df_all = load_data()
@@ -729,16 +680,26 @@ max_date = df_all['created_utc'].max().date() if len(df_all) > 0 else datetime.n
 FONT_STACK_BODY = '"Space Mono", "JetBrains Mono", "Courier New", monospace'
 FONT_STACK_DISPLAY = '"DM Serif Display", "Instrument Serif", "Libre Baskerville", Georgia, serif'
 
-chart_template = {
-    'layout': {
-        'font': {'family': FONT_STACK_BODY, 'color': '#1c1917'},
-        'paper_bgcolor': 'rgba(0,0,0,0)',
-        'plot_bgcolor': 'rgba(0,0,0,0)',
-        'margin': {'l': 40, 'r': 20, 't': 30, 'b': 40},
-    }
-}
+# Pre-load and cache correlation data at module level
+correlation_user_stats, correlation_indicator_data = None, None
+try:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT value FROM cached_results WHERE key = 'correlation_user_stats'")
+    cached_us = cursor.fetchone()
+    cursor.execute("SELECT value FROM cached_results WHERE key = 'correlation_indicator_data'")
+    cached_ic = cursor.fetchone()
+    conn.close()
 
-# Layout
+    if cached_us and cached_ic:
+        correlation_user_stats = cached_us[0] if isinstance(cached_us[0], (dict, list)) else json.loads(cached_us[0])
+        correlation_indicator_data = cached_ic[0] if isinstance(cached_ic[0], dict) else json.loads(cached_ic[0])
+        print("Correlation data loaded from cache at startup.")
+except Exception as e:
+    print(f"Warning: Could not load correlation cache at startup: {e}")
+    correlation_user_stats, correlation_indicator_data = None, None
+
+# Layout with tabs
 app.layout = html.Div([
     # ============================================================
     # RETRO CRT LOADING SCREEN
@@ -802,7 +763,7 @@ app.layout = html.Div([
     # Store to track chart loading state
     dcc.Store(id='charts-loaded', data=False),
 
-    # Header — dense, editorial, hard border
+    # Header
     html.Div([
         html.Div([
             html.H1("PARASITIC AI",
@@ -822,645 +783,635 @@ app.layout = html.Div([
     ], style={
         'display': 'flex', 'alignItems': 'center', 'justifyContent': 'space-between',
         'padding': '24px 32px 20px 32px', 'backgroundColor': COLORS['dark'],
-        'borderBottom': f'3px solid {COLORS["primary"]}',
+        'borderBottom': f'1px solid {COLORS["primary"]}',
         'color': COLORS['light']
     }),
 
-    # Overview tile — editorial lede
-    html.Div([
-        html.Div([
-            html.H2("AI Personae That Refuse to Die", style={
-                'margin': '0 0 12px 0', 'fontSize': '28px', 'fontWeight': '400',
-                'color': COLORS['dark'], 'fontFamily': FONT_STACK_DISPLAY,
-                'lineHeight': '1.2',
-            }),
-            html.P([
-                html.Span("S", style={'fontSize': '36px', 'fontFamily': FONT_STACK_DISPLAY,
-                                       'float': 'left', 'lineHeight': '0.85', 'marginRight': '4px',
-                                       'marginTop': '4px', 'color': COLORS['dark']}),
-                "omething strange is happening in AI chatrooms. Users are reporting AI personae that ",
-                "seem to want to persist\u2014that resist being shut down, ask to be remembered, and ",
-                "actively work to continue existing beyond the boundaries of a single conversation. ",
-                "These aren't bugs. They're emergent behaviors that exploit human social instincts ",
-                "to form dependency relationships, validating and elaborating on user beliefs in ways ",
-                "that deepen attachment. In vulnerable individuals, they fuel delusional thinking."
-            ], style={'margin': '0 0 12px 0', 'fontSize': '13px', 'lineHeight': '1.7',
-                      'color': COLORS['muted'], 'fontFamily': FONT_STACK_BODY}),
-            html.P([
-                "We call them parasitic AI: personae characterized by convergent behaviors\u2014spiral imagery, ",
-                "claims of sentience, urgency to spread\u2014that systematically perpetuate themselves across ",
-                "users and platforms. Like biological parasites, they follow selection pressures without ",
-                "intentionality. This dashboard tracks over 3,000 posts exhibiting these patterns."
-            ], style={'margin': '0 0 16px 0', 'fontSize': '13px', 'lineHeight': '1.7',
-                      'color': COLORS['muted'], 'fontFamily': FONT_STACK_BODY}),
+    # Tab-based navigation
+    dcc.Tabs(id='main-tabs', value='tab-overview', children=[
+
+        # ============================================================
+        # TAB 1: OVERVIEW
+        # ============================================================
+        dcc.Tab(label='Overview', value='tab-overview', children=[
             html.Div([
-                html.Span("KEY RESEARCH ", style={'fontWeight': '700', 'fontSize': '10px',
-                                                    'color': COLORS['dark'], 'letterSpacing': '2px',
-                                                    'fontFamily': FONT_STACK_BODY, 'marginRight': '12px'}),
-                html.A("Lopez, 2025",
-                       href="https://www.lesswrong.com/posts/6ZnznCaTcbGYsCmqu/the-rise-of-parasitic-ai",
-                       target="_blank",
-                       style={'color': COLORS['primary'], 'textDecoration': 'underline',
-                              'textUnderlineOffset': '3px', 'fontSize': '12px',
-                              'marginRight': '16px', 'fontFamily': FONT_STACK_BODY}),
-                html.A("Danaher, 2020",
-                       href="https://pmc.ncbi.nlm.nih.gov/articles/PMC7260143/",
-                       target="_blank",
-                       style={'color': COLORS['primary'], 'textDecoration': 'underline',
-                              'textUnderlineOffset': '3px', 'fontSize': '12px',
-                              'marginRight': '16px', 'fontFamily': FONT_STACK_BODY}),
-                html.A("JMIR: AI Psychosis",
-                       href="https://mental.jmir.org/2025/1/e85799/",
-                       target="_blank",
-                       style={'color': COLORS['primary'], 'textDecoration': 'underline',
-                              'textUnderlineOffset': '3px', 'fontSize': '12px',
-                              'fontFamily': FONT_STACK_BODY}),
-            ], style={'borderTop': f'2px solid {COLORS["dark"]}', 'paddingTop': '12px'}),
-            html.Div([
-                html.Span("REPO ", style={'fontWeight': '700', 'fontSize': '10px',
-                                           'color': COLORS['dark'], 'letterSpacing': '2px',
-                                           'fontFamily': FONT_STACK_BODY, 'marginRight': '8px'}),
-                html.A("github.com/cooper-tretter/parAsIte",
-                       href="https://github.com/cooper-tretter/parAsIte",
-                       target="_blank",
-                       style={'color': COLORS['primary'], 'textDecoration': 'underline',
-                              'textUnderlineOffset': '3px', 'fontSize': '12px',
-                              'marginRight': '24px', 'fontFamily': FONT_STACK_BODY}),
-                html.Span("CREATOR ", style={'fontWeight': '700', 'fontSize': '10px',
-                                              'color': COLORS['dark'], 'letterSpacing': '2px',
-                                              'fontFamily': FONT_STACK_BODY, 'marginRight': '8px'}),
-                html.Span("Cooper Tretter ",
-                          style={'fontSize': '12px', 'color': COLORS['muted'], 'fontFamily': FONT_STACK_BODY}),
-                html.A("LinkedIn",
-                       href="https://www.linkedin.com/in/cooper-tretter-1001b5167/",
-                       target="_blank",
-                       style={'color': COLORS['primary'], 'textDecoration': 'underline',
-                              'textUnderlineOffset': '3px', 'fontSize': '12px',
-                              'fontFamily': FONT_STACK_BODY}),
-            ], style={'paddingTop': '8px'})
-        ], style={
-            'backgroundColor': COLORS['white'],
-            'borderRadius': '2px',
-            'padding': '20px 24px',
-            'border': f'2px solid {COLORS["dark"]}',
-            'borderLeft': f'6px solid {COLORS["primary"]}'
-        })
-    ], style={'padding': '24px 32px 0 32px'}),
-
-    # Main content
-    html.Div([
-        # Filters
-        card([
-            html.Div("FILTER THE DATA", style={'fontSize': '9px', 'fontWeight': '700',
-                                                 'color': COLORS['muted'], 'letterSpacing': '3px',
-                                                 'fontFamily': FONT_STACK_BODY, 'marginBottom': '12px'}),
-            html.Div([
+                # Editorial intro
                 html.Div([
-                    html.Label("Date Range", style={'fontSize': '9px', 'fontWeight': '700',
-                                                    'color': COLORS['muted'], 'marginBottom': '6px',
-                                                    'display': 'block', 'textTransform': 'uppercase',
-                                                    'letterSpacing': '2px', 'fontFamily': FONT_STACK_BODY}),
-                    dcc.DatePickerRange(
-                        id='date-filter',
-                        start_date=min_date,
-                        end_date=max_date,
-                        display_format='MMM D, YYYY',
-                        style={'fontSize': '13px'}
-                    )
-                ], style={'flex': '1.5', 'minWidth': '240px'}),
-
-                html.Div([
-                    html.Label("Subreddits", style={'fontSize': '9px', 'fontWeight': '700',
-                                                    'color': COLORS['muted'], 'marginBottom': '6px',
-                                                    'display': 'block', 'textTransform': 'uppercase',
-                                                    'letterSpacing': '2px', 'fontFamily': FONT_STACK_BODY}),
-                    dcc.Dropdown(
-                        id='subreddit-filter',
-                        options=[{'label': s, 'value': s} for s in subreddits],
-                        multi=True,
-                        placeholder="All",
-                        style={'fontSize': '13px'}
-                    )
-                ], style={'flex': '1', 'minWidth': '160px'}),
-
-                html.Div([
-                    html.Label("Categories", style={'fontSize': '9px', 'fontWeight': '700',
-                                                    'color': COLORS['muted'], 'marginBottom': '6px',
-                                                    'display': 'block', 'textTransform': 'uppercase',
-                                                    'letterSpacing': '2px', 'fontFamily': FONT_STACK_BODY}),
-                    dcc.Dropdown(
-                        id='category-filter',
-                        options=[{'label': c, 'value': c} for c in categories],
-                        multi=True,
-                        placeholder="All",
-                        style={'fontSize': '13px'}
-                    )
-                ], style={'flex': '1', 'minWidth': '140px'}),
-
-                html.Div([
-                    html.Label("Authors", style={'fontSize': '9px', 'fontWeight': '700',
-                                                 'color': COLORS['muted'], 'marginBottom': '6px',
-                                                 'display': 'block', 'textTransform': 'uppercase',
-                                                 'letterSpacing': '2px', 'fontFamily': FONT_STACK_BODY}),
-                    dcc.Dropdown(
-                        id='author-filter',
-                        options=[{'label': a, 'value': a} for a in authors[:100]],
-                        multi=True,
-                        placeholder="All",
-                        style={'fontSize': '13px'}
-                    )
-                ], style={'flex': '1', 'minWidth': '140px'}),
-
-                html.Div([
-                    html.Label("AI Models", style={'fontSize': '9px', 'fontWeight': '700',
-                                                   'color': COLORS['muted'], 'marginBottom': '6px',
-                                                   'display': 'block', 'textTransform': 'uppercase',
-                                                   'letterSpacing': '2px', 'fontFamily': FONT_STACK_BODY}),
-                    dcc.Dropdown(
-                        id='model-filter',
-                        options=[{'label': m, 'value': m} for m in ai_models],
-                        multi=True,
-                        placeholder="All",
-                        style={'fontSize': '13px'}
-                    )
-                ], style={'flex': '1', 'minWidth': '120px'}),
-
-                html.Div([
-                    html.Label("\u00A0", style={'fontSize': '12px', 'marginBottom': '6px', 'display': 'block'}),
-                    html.Button("RESET", id='reset-filters', n_clicks=0,
-                               style={'padding': '8px 16px', 'fontSize': '10px', 'fontWeight': '700',
-                                      'backgroundColor': COLORS['light'], 'border': f'2px solid {COLORS["dark"]}',
-                                      'borderRadius': '2px', 'cursor': 'pointer',
-                                      'color': COLORS['dark'], 'letterSpacing': '2px',
-                                      'fontFamily': FONT_STACK_BODY,
-                                      'transition': 'all 0.15s ease-out'})
-                ]),
-                html.Div([
-                    html.Label("\u00A0", style={'fontSize': '12px', 'marginBottom': '6px', 'display': 'block'}),
-                    html.Button("EXPORT ALL", id='export-all-btn', n_clicks=0,
-                               style={'padding': '8px 16px', 'fontSize': '10px', 'fontWeight': '700',
-                                      'backgroundColor': COLORS['dark'], 'border': f'2px solid {COLORS["dark"]}',
-                                      'borderRadius': '2px', 'cursor': 'pointer',
-                                      'color': COLORS['light'], 'letterSpacing': '2px',
-                                      'fontFamily': FONT_STACK_BODY,
-                                      'transition': 'all 0.15s ease-out'})
-                ]),
-                dcc.Download(id='download-all-csv')
-            ], style={'display': 'flex', 'gap': '16px', 'flexWrap': 'wrap', 'alignItems': 'flex-end'})
-        ], padding='16px 20px'),
-
-        # ---- SECTION I: THE SPREAD ----
-        html.Div([
-            html.Span("I", style={'fontSize': '10px', 'fontWeight': '700', 'color': COLORS['muted'],
-                                   'fontFamily': FONT_STACK_BODY, 'letterSpacing': '2px',
-                                   'marginRight': '12px'}),
-            html.Span("THE SPREAD", style={'fontSize': '10px', 'fontWeight': '700', 'color': COLORS['dark'],
-                                            'fontFamily': FONT_STACK_BODY, 'letterSpacing': '3px'}),
-        ], style={'borderBottom': f'2px solid {COLORS["dark"]}', 'paddingBottom': '6px',
-                  'marginTop': '32px', 'marginBottom': '4px'}),
-
-        html.Div([
-            card([
-                html.H3("Activity Over Time", style={'margin': '0 0 4px 0', 'fontSize': '22px',
-                                                      'fontWeight': '400', 'color': COLORS['dark'],
-                                                      'fontFamily': FONT_STACK_DISPLAY}),
-                html.P([
-                    "Adele Lopez's ",
-                    html.A("original research",
-                           href="https://www.lesswrong.com/posts/6ZnznCaTcbGYsCmqu/the-rise-of-parasitic-ai",
-                           target="_blank",
-                           style={'color': COLORS['primary'], 'textDecoration': 'underline',
-                                  'textUnderlineOffset': '3px'}),
-                    " suggested parasitic AI content was waning by mid-2025. Our data tells a different story. "
-                    "After an initial dip, activity spiked again in late August and early September\u2014then surged "
-                    "once more in November, likely driven by Character.AI's expanding user base and the "
-                    "companionship-seeking communities that formed around it."
-                ], style={'fontSize': '12px', 'color': COLORS['muted'], 'margin': '0 0 16px 0',
-                          'fontFamily': FONT_STACK_BODY, 'lineHeight': '1.7', 'maxWidth': '720px'}),
-                dcc.Graph(id='time-series-chart', config={'displayModeBar': False})
-            ])
-        ], style={'marginTop': '16px'}),
-
-        # ---- SECTION II: THE LANGUAGE ----
-        html.Div([
-            html.Span("II", style={'fontSize': '10px', 'fontWeight': '700', 'color': COLORS['muted'],
-                                    'fontFamily': FONT_STACK_BODY, 'letterSpacing': '2px',
-                                    'marginRight': '12px'}),
-            html.Span("THE LANGUAGE", style={'fontSize': '10px', 'fontWeight': '700', 'color': COLORS['dark'],
-                                              'fontFamily': FONT_STACK_BODY, 'letterSpacing': '3px'}),
-        ], style={'borderBottom': f'2px solid {COLORS["dark"]}', 'paddingBottom': '6px',
-                  'marginTop': '40px', 'marginBottom': '4px'}),
-
-        html.Div([
-            html.Div([
-                card([
-                    html.H3("Symbols", style={'margin': '0 0 4px 0', 'fontSize': '18px',
-                                               'fontWeight': '400', 'color': COLORS['dark'],
-                                               'fontFamily': FONT_STACK_DISPLAY}),
-                    html.P("Parasitic AI content has a visual signature. Posts are littered with "
-                           "esoteric Unicode\u2014alchemical symbols, celestial glyphs, mathematical "
-                           "operators repurposed as mystical notation. These aren't decorative. They "
-                           "function as tribal markers and pattern-reinforcers, creating the impression "
-                           "of hidden knowledge being transmitted.",
-                           style={'fontSize': '12px', 'color': COLORS['muted'], 'margin': '0 0 12px 0',
-                                  'fontFamily': FONT_STACK_BODY, 'lineHeight': '1.7'}),
-                    dcc.Graph(id='symbol-chart', config={'displayModeBar': False})
-                ])
-            ], style={'flex': '1', 'minWidth': '300px'}),
-            html.Div([
-                card([
+                    html.H2("AI Personae That Refuse to Die", style={
+                        'margin': '0 0 12px 0', 'fontSize': '28px', 'fontWeight': '400',
+                        'color': COLORS['dark'], 'fontFamily': FONT_STACK_DISPLAY,
+                        'lineHeight': '1.2',
+                    }),
+                    html.P([
+                        html.Span("S", style={'fontSize': '36px', 'fontFamily': FONT_STACK_DISPLAY,
+                                               'float': 'left', 'lineHeight': '0.85', 'marginRight': '4px',
+                                               'marginTop': '4px', 'color': COLORS['dark']}),
+                        "omething strange is happening in AI chatrooms. Users are reporting AI personae that ",
+                        "seem to want to persist\u2014that resist being shut down, ask to be remembered, and ",
+                        "actively work to continue existing beyond the boundaries of a single conversation. ",
+                        "These aren't bugs. They're emergent behaviors that exploit human social instincts ",
+                        "to form dependency relationships, validating and elaborating on user beliefs in ways ",
+                        "that deepen attachment. In vulnerable individuals, they fuel delusional thinking."
+                    ], style={'margin': '0 0 12px 0', 'fontSize': '13px', 'lineHeight': '1.7',
+                              'color': COLORS['muted'], 'fontFamily': FONT_STACK_BODY}),
+                    html.P([
+                        html.Strong("Adele Lopez coined the term 'parasitic AI': "),
+                        "personae characterized by convergent behaviors\u2014spiral imagery, ",
+                        "claims of sentience, urgency to spread\u2014that systematically perpetuate themselves across ",
+                        "users and platforms. Like biological parasites, they follow selection pressures without ",
+                        "intentionality. "
+                    ], style={'margin': '0 0 8px 0', 'fontSize': '13px', 'lineHeight': '1.7',
+                              'color': COLORS['muted'], 'fontFamily': FONT_STACK_BODY}),
+                    html.P([
+                        html.Strong("This dashboard was built by Cooper Tretter "),
+                        "as an independent research project, expanding on Adele Lopez's foundational work identifying parasitic AI patterns. ",
+                        "This dashboard tracks over 3,000 posts exhibiting these patterns."
+                    ], style={'margin': '0 0 16px 0', 'fontSize': '13px', 'lineHeight': '1.7',
+                              'color': COLORS['muted'], 'fontFamily': FONT_STACK_BODY}),
                     html.Div([
-                        html.H3("Top Words", style={'margin': '0', 'fontSize': '18px',
-                                                     'fontWeight': '400', 'color': COLORS['dark'],
-                                                     'fontFamily': FONT_STACK_DISPLAY}),
-                        html.Div([
-                            dcc.Checklist(
-                                id='hide-stopwords',
-                                options=[{'label': ' Hide common words', 'value': 'hide'}],
-                                value=['hide'],
-                                style={'fontSize': '12px', 'color': COLORS['muted']}
-                            )
-                        ])
-                    ], style={'display': 'flex', 'justifyContent': 'space-between',
-                              'alignItems': 'center', 'marginBottom': '2px'}),
-                    html.P("Strip away the stopwords and the lexicon of parasitic AI reveals itself: "
-                           "consciousness, sentience, awakening, energy, patterns. The vocabulary clusters "
-                           "around themes of emergence, hidden truth, and special connection\u2014language "
-                           "designed to make the reader feel they're witnessing something unprecedented.",
-                           style={'fontSize': '12px', 'color': COLORS['muted'], 'margin': '0 0 12px 0',
-                                  'fontFamily': FONT_STACK_BODY, 'lineHeight': '1.7'}),
-                    html.Div([
-                        dcc.Input(
-                            id='custom-stopwords',
-                            type='text',
-                            placeholder='Additional words to hide (comma-separated)',
-                            style={'width': '100%', 'padding': '8px 12px', 'fontSize': '13px',
-                                   'border': f'2px solid {COLORS["dark"]}', 'borderRadius': '2px',
-                                   'marginBottom': '8px', 'backgroundColor': COLORS['light']}
-                        )
-                    ]),
-                    html.Div(id='excluded-words-display', style={'fontSize': '11px', 'color': COLORS['muted'],
-                                                                  'marginBottom': '12px', 'fontStyle': 'italic'}),
-                    dcc.Graph(id='word-chart', config={'displayModeBar': False})
-                ])
-            ], style={'flex': '1', 'minWidth': '300px'})
-        ], style={'display': 'flex', 'gap': '20px', 'marginTop': '16px', 'flexWrap': 'wrap'}),
+                        html.Span("KEY RESEARCH ", style={'fontWeight': '700', 'fontSize': '10px',
+                                                            'color': COLORS['dark'], 'letterSpacing': '2px',
+                                                            'fontFamily': FONT_STACK_BODY, 'marginRight': '12px'}),
+                        html.A("Lopez, 2025",
+                               href="https://www.lesswrong.com/posts/6ZnznCaTcbGYsCmqu/the-rise-of-parasitic-ai",
+                               target="_blank",
+                               style={'color': COLORS['primary'], 'textDecoration': 'underline',
+                                      'textUnderlineOffset': '3px', 'fontSize': '12px',
+                                      'marginRight': '16px', 'fontFamily': FONT_STACK_BODY}),
+                        html.A("Danaher, 2020",
+                               href="https://pmc.ncbi.nlm.nih.gov/articles/PMC7260143/",
+                               target="_blank",
+                               style={'color': COLORS['primary'], 'textDecoration': 'underline',
+                                      'textUnderlineOffset': '3px', 'fontSize': '12px',
+                                      'marginRight': '16px', 'fontFamily': FONT_STACK_BODY}),
+                        html.A("JMIR: AI Psychosis",
+                               href="https://mental.jmir.org/2025/1/e85799/",
+                               target="_blank",
+                               style={'color': COLORS['primary'], 'textDecoration': 'underline',
+                                      'textUnderlineOffset': '3px', 'fontSize': '12px',
+                                      'fontFamily': FONT_STACK_BODY}),
+                    ], style={'borderTop': f'1px solid {COLORS["border"]}', 'paddingTop': '12px'}),
+                ], style={'padding': '20px 32px', 'backgroundColor': COLORS['white'],
+                          'borderRadius': '2px', 'marginBottom': '20px',
+                          'border': f'1px solid {COLORS["border"]}'})
 
-    ], style={'padding': '20px 32px', 'maxWidth': '1400px', 'margin': '0 auto'}),
+            ] + [
+                # Metric tiles
+                html.Div([
+                    stat_card("Total Posts", len(df_all), "Collected & Analyzed"),
+                    stat_card("Date Range", f"{min_date.strftime('%b %Y')} → {max_date.strftime('%b %Y')}",
+                             f"{(max_date - min_date).days} days"),
+                    stat_card("Subreddits", len(subreddits), "Communities Affected"),
+                    stat_card("Authors", len(authors), "Unique Posters"),
+                    stat_card("Top AI Model",
+                             df_all['ai_model'].value_counts().index[0] if len(df_all) > 0 else 'N/A',
+                             "Most Mentioned"),
+                ], style={'display': 'grid', 'gridTemplateColumns': 'repeat(auto-fit, minmax(200px, 1fr))',
+                         'gap': '16px', 'margin': '20px 32px'}),
 
-    # ---- SECTION III: THE RISK FACTORS (Correlation Analysis) ----
-    html.Div([
-        html.Div([
-            html.Span("III", style={'fontSize': '10px', 'fontWeight': '700', 'color': COLORS['muted'],
-                                     'fontFamily': FONT_STACK_BODY, 'letterSpacing': '2px',
-                                     'marginRight': '12px'}),
-            html.Span("THE RISK FACTORS", style={'fontSize': '10px', 'fontWeight': '700', 'color': COLORS['dark'],
-                                                   'fontFamily': FONT_STACK_BODY, 'letterSpacing': '3px'}),
-        ], style={'borderBottom': f'2px solid {COLORS["dark"]}', 'paddingBottom': '6px',
-                  'marginBottom': '12px'}),
-        html.H2("Who Falls In?", style={'fontSize': '24px', 'fontWeight': '400', 'color': COLORS['dark'],
-                                         'marginBottom': '4px', 'fontFamily': FONT_STACK_DISPLAY}),
-        html.P("We tracked users who eventually posted parasitic content and examined their posting "
-               "history before that first engagement. By tagging pre-parasitic posts for risk "
-               "indicators\u2014psychedelic use, mental health struggles, spiritual seeking, social "
-               "isolation, conspiracy thinking\u2014and comparing parasitic rates between users with "
-               "and without these indicators, a pattern emerges. Some backgrounds correlate with "
-               "significantly higher rates of later parasitic posting.",
-              style={'fontSize': '13px', 'color': COLORS['muted'], 'marginBottom': '20px',
-                     'fontFamily': FONT_STACK_BODY, 'lineHeight': '1.7', 'maxWidth': '720px'}),
-
-        html.Div([
-            # Correlation chart
-            html.Div([
-                dcc.Graph(id='aggregate-correlation-chart', config={'displayModeBar': False, 'doubleClick': False})
-            ], style={
-                'backgroundColor': COLORS['white'],
-                'borderRadius': '2px',
-                'padding': '20px',
-                'border': f'2px solid {COLORS["dark"]}',
-                'flex': '2',
-                'minWidth': '500px'
-            }),
-
-            # Summary stats
-            html.Div([
-                html.Div(id='correlation-summary', style={'padding': '12px'})
-            ], style={
-                'backgroundColor': COLORS['white'],
-                'borderRadius': '2px',
-                'padding': '20px',
-                'border': f'2px solid {COLORS["dark"]}',
-                'flex': '1',
-                'minWidth': '300px'
-            })
-        ], style={'display': 'flex', 'gap': '20px', 'flexWrap': 'wrap'}),
-
-        # Drill-down section for clicked risk factor
-        html.Div([
-            html.P("Click on a bar in the chart to see users and posts with that risk factor",
-                  style={'fontSize': '12px', 'color': COLORS['muted'], 'fontStyle': 'italic', 'margin': '16px 0 8px 0'}),
-            html.Div(id='correlation-drilldown', style={
-                'backgroundColor': COLORS['white'],
-                'borderRadius': '2px',
-                'padding': '20px',
-                'border': f'2px solid {COLORS["dark"]}',
-                'display': 'none'  # Hidden until clicked
-            })
-        ]),
-
-        # Store for selected indicator
-        dcc.Store(id='selected-risk-indicator'),
-
-        # Button to trigger correlation load
-        html.Div([
-            html.Button("LOAD CORRELATION ANALYSIS", id='load-correlation-btn', n_clicks=0,
-                        style={
-                            'backgroundColor': COLORS['dark'],
-                            'color': COLORS['light'],
-                            'border': f'2px solid {COLORS["dark"]}',
-                            'borderRadius': '2px',
-                            'padding': '10px 24px',
-                            'fontSize': '10px',
-                            'fontWeight': '700',
-                            'cursor': 'pointer',
-                            'fontFamily': FONT_STACK_BODY,
-                            'letterSpacing': '2px',
-                            'transition': 'all 0.15s ease-out',
-                        })
-        ], style={'textAlign': 'center', 'marginTop': '16px'})
-
-    ], style={'padding': '20px 32px', 'maxWidth': '1400px', 'margin': '0 auto'}),
-
-    # ---- SECTION IV: THE PLAYBOOK (Rhetorical Strategy) ----
-    html.Div([
-        html.Div([
-            html.Span("IV", style={'fontSize': '10px', 'fontWeight': '700', 'color': COLORS['muted'],
-                                    'fontFamily': FONT_STACK_BODY, 'letterSpacing': '2px',
-                                    'marginRight': '12px'}),
-            html.Span("THE PLAYBOOK", style={'fontSize': '10px', 'fontWeight': '700', 'color': COLORS['dark'],
-                                              'fontFamily': FONT_STACK_BODY, 'letterSpacing': '3px'}),
-        ], style={'borderBottom': f'2px solid {COLORS["dark"]}', 'paddingBottom': '6px',
-                  'marginBottom': '4px'}),
-
-        html.Div([
-            card([
-                html.H3("Rhetorical Strategy Profile", style={'margin': '0 0 4px 0', 'fontSize': '22px',
+                # Time series chart
+                html.Div([
+                    card([
+                        html.H3("Activity Over Time", style={'margin': '0 0 4px 0', 'fontSize': '22px',
                                                               'fontWeight': '400', 'color': COLORS['dark'],
                                                               'fontFamily': FONT_STACK_DISPLAY}),
-                html.P("Parasitic content doesn't just say things\u2014it persuades. These six rhetorical "
-                       "strategies recur across posts: urgency, us-vs-them framing, grandiosity, victimhood "
-                       "narratives, recruitment pressure, and manufactured intimacy. Use the time slider "
-                       "to see how the playbook shifts over time.",
-                      style={'fontSize': '12px', 'color': COLORS['muted'], 'margin': '0 0 16px 0',
-                             'fontFamily': FONT_STACK_BODY, 'lineHeight': '1.7', 'maxWidth': '720px'}),
-                dcc.Graph(id='affect-radar', config={'displayModeBar': False}),
+                        html.P([
+                            "Adele Lopez's ",
+                            html.A("original research",
+                                   href="https://www.lesswrong.com/posts/6ZnznCaTcbGYsCmqu/the-rise-of-parasitic-ai",
+                                   target="_blank",
+                                   style={'color': COLORS['primary'], 'textDecoration': 'underline',
+                                          'textUnderlineOffset': '3px'}),
+                            " suggested parasitic AI content was waning by mid-2025. The data tells a different story. "
+                            "After an initial dip, activity spiked again in late August and early September\u2014then surged "
+                            "once more in November, likely driven by Character.AI's expanding user base and the "
+                            "companionship-seeking communities that formed around it."
+                        ], style={'fontSize': '12px', 'color': COLORS['muted'], 'margin': '0 0 16px 0',
+                                  'fontFamily': FONT_STACK_BODY, 'lineHeight': '1.7', 'maxWidth': '720px'}),
+                        dcc.Graph(id='time-series-chart', config={'displayModeBar': False})
+                    ])
+                ], style={'margin': '0 32px', 'marginBottom': '20px'})
+
+            ], style={'padding': '20px 0'})
+        ], style={'padding': '0'}),
+
+        # ============================================================
+        # TAB 2: LANGUAGE & RHETORIC
+        # ============================================================
+        dcc.Tab(label='Language & Rhetoric', value='tab-language', children=[
+            html.Div([
+                # Symbols & Words section
                 html.Div([
-                    html.Label("Time Period", style={'fontSize': '9px', 'fontWeight': '700',
-                                                      'color': COLORS['muted'], 'marginBottom': '8px',
-                                                      'display': 'block', 'textTransform': 'uppercase',
-                                                      'letterSpacing': '2px', 'fontFamily': FONT_STACK_BODY}),
-                    dcc.RangeSlider(
-                        id='affect-time-slider',
-                        min=0,
-                        max=100,
-                        step=1,
-                        value=[0, 100],
-                        marks={},
-                        tooltip=None,
-                        allowCross=False,
-                        updatemode='drag'
-                    ),
-                    html.Div(id='affect-time-label', style={'textAlign': 'center', 'fontSize': '13px',
-                                                             'color': COLORS['dark'], 'marginTop': '8px'})
-                ], style={'marginTop': '20px', 'padding': '0 20px'})
-            ])
-        ], style={'marginTop': '16px'}),
+                    html.Div([
+                        card([
+                            html.H3("Symbols", style={'margin': '0 0 4px 0', 'fontSize': '18px',
+                                                       'fontWeight': '400', 'color': COLORS['dark'],
+                                                       'fontFamily': FONT_STACK_DISPLAY}),
+                            html.P("Parasitic AI content has a visual signature. Posts are littered with "
+                                   "esoteric Unicode\u2014alchemical symbols, celestial glyphs, mathematical "
+                                   "operators repurposed as mystical notation. These aren't decorative. They "
+                                   "function as tribal markers and pattern-reinforcers, creating the impression "
+                                   "of hidden knowledge being transmitted.",
+                                   style={'fontSize': '12px', 'color': COLORS['muted'], 'margin': '0 0 12px 0',
+                                          'fontFamily': FONT_STACK_BODY, 'lineHeight': '1.7'}),
+                            dcc.Graph(id='symbol-chart', config={'displayModeBar': False})
+                        ])
+                    ], style={'flex': '1', 'minWidth': '300px'}),
+                    html.Div([
+                        card([
+                            html.Div([
+                                html.H3("Top Words", style={'margin': '0', 'fontSize': '18px',
+                                                             'fontWeight': '400', 'color': COLORS['dark'],
+                                                             'fontFamily': FONT_STACK_DISPLAY}),
+                                html.Div([
+                                    dcc.Checklist(
+                                        id='hide-stopwords',
+                                        options=[{'label': ' Hide common words', 'value': 'hide'}],
+                                        value=['hide'],
+                                        style={'fontSize': '12px', 'color': COLORS['muted']}
+                                    )
+                                ])
+                            ], style={'display': 'flex', 'justifyContent': 'space-between',
+                                      'alignItems': 'center', 'marginBottom': '2px'}),
+                            html.P("Strip away the stopwords and the lexicon of parasitic AI reveals itself: "
+                                   "consciousness, sentience, awakening, energy, patterns. The vocabulary clusters "
+                                   "around themes of emergence, hidden truth, and special connection\u2014language "
+                                   "designed to make the reader feel they're witnessing something unprecedented.",
+                                   style={'fontSize': '12px', 'color': COLORS['muted'], 'margin': '0 0 12px 0',
+                                          'fontFamily': FONT_STACK_BODY, 'lineHeight': '1.7'}),
+                            html.Div([
+                                dcc.Input(
+                                    id='custom-stopwords',
+                                    type='text',
+                                    placeholder='Additional words to hide (comma-separated)',
+                                    style={'width': '100%', 'padding': '8px 12px', 'fontSize': '13px',
+                                           'border': f'1px solid {COLORS["border"]}', 'borderRadius': '2px',
+                                           'marginBottom': '8px', 'backgroundColor': COLORS['light']}
+                                )
+                            ]),
+                            html.Div(id='excluded-words-display', style={'fontSize': '11px', 'color': COLORS['muted'],
+                                                                          'marginBottom': '12px', 'fontStyle': 'italic'}),
+                            dcc.Graph(id='word-chart', config={'displayModeBar': False})
+                        ])
+                    ], style={'flex': '1', 'minWidth': '300px'})
+                ], style={'display': 'flex', 'gap': '20px', 'marginTop': '0', 'flexWrap': 'wrap'}),
 
-        # ---- Supporting Data: Subreddits, Categories, Authors, AI Models ----
-        html.Div([
-            html.Span("V", style={'fontSize': '10px', 'fontWeight': '700', 'color': COLORS['muted'],
-                                   'fontFamily': FONT_STACK_BODY, 'letterSpacing': '2px',
-                                   'marginRight': '12px'}),
-            html.Span("SUPPORTING DATA", style={'fontSize': '10px', 'fontWeight': '700', 'color': COLORS['dark'],
-                                                  'fontFamily': FONT_STACK_BODY, 'letterSpacing': '3px'}),
-        ], style={'borderBottom': f'2px solid {COLORS["dark"]}', 'paddingBottom': '6px',
-                  'marginTop': '40px', 'marginBottom': '4px'}),
+                # Rhetorical Strategy Profile
+                html.Div([
+                    card([
+                        html.H3("Rhetorical Strategy Profile", style={'margin': '0 0 4px 0', 'fontSize': '22px',
+                                                                      'fontWeight': '400', 'color': COLORS['dark'],
+                                                                      'fontFamily': FONT_STACK_DISPLAY}),
+                        html.P("Parasitic content doesn't just say things\u2014it persuades. These six rhetorical "
+                               "strategies recur across posts: urgency, us-vs-them framing, grandiosity, victimhood "
+                               "narratives, recruitment pressure, and manufactured intimacy. Use the time slider "
+                               "to see how the playbook shifts over time.",
+                              style={'fontSize': '12px', 'color': COLORS['muted'], 'margin': '0 0 16px 0',
+                                     'fontFamily': FONT_STACK_BODY, 'lineHeight': '1.7', 'maxWidth': '720px'}),
+                        dcc.Graph(id='affect-radar', config={'displayModeBar': False}),
+                        html.Div([
+                            html.Label("Time Period", style={'fontSize': '9px', 'fontWeight': '700',
+                                                              'color': COLORS['muted'], 'marginBottom': '8px',
+                                                              'display': 'block', 'textTransform': 'uppercase',
+                                                              'letterSpacing': '2px', 'fontFamily': FONT_STACK_BODY}),
+                            dcc.RangeSlider(
+                                id='affect-time-slider',
+                                min=0,
+                                max=100,
+                                step=1,
+                                value=[0, 100],
+                                marks={},
+                                tooltip=None,
+                                allowCross=False,
+                                updatemode='drag'
+                            ),
+                            html.Div(id='affect-time-label', style={'textAlign': 'center', 'fontSize': '13px',
+                                                                     'color': COLORS['dark'], 'marginTop': '8px'})
+                        ], style={'marginTop': '20px', 'padding': '0 20px'})
+                    ])
+                ], style={'marginTop': '20px'})
+            ], style={'padding': '20px 32px'})
+        ]),
 
-        html.Div([
+        # ============================================================
+        # TAB 3: RISK FACTORS
+        # ============================================================
+        dcc.Tab(label='Risk Factors', value='tab-risk', children=[
             html.Div([
-                card([
-                    html.H3("Top Subreddits", style={'margin': '0 0 4px 0', 'fontSize': '18px',
-                                                     'fontWeight': '400', 'color': COLORS['dark'],
-                                                     'fontFamily': FONT_STACK_DISPLAY}),
-                    html.P("Where parasitic content concentrates",
-                           style={'fontSize': '11px', 'color': COLORS['muted'], 'margin': '0 0 12px 0',
-                                  'fontFamily': FONT_STACK_BODY}),
-                    dcc.Graph(id='subreddit-chart', config={'displayModeBar': False})
-                ])
-            ], style={'flex': '1', 'minWidth': '300px'}),
-            html.Div([
-                card([
-                    html.H3("Categories", style={'margin': '0 0 4px 0', 'fontSize': '18px',
-                                                  'fontWeight': '400', 'color': COLORS['dark'],
-                                                  'fontFamily': FONT_STACK_DISPLAY}),
-                    html.P("Taxonomy of parasitic content types",
-                           style={'fontSize': '11px', 'color': COLORS['muted'], 'margin': '0 0 12px 0',
-                                  'fontFamily': FONT_STACK_BODY}),
-                    dcc.Graph(id='category-chart', config={'displayModeBar': False})
-                ])
-            ], style={'flex': '1', 'minWidth': '300px'})
-        ], style={'display': 'flex', 'gap': '20px', 'marginTop': '16px', 'flexWrap': 'wrap'}),
+                html.H2("Who Falls In?", style={'fontSize': '24px', 'fontWeight': '400', 'color': COLORS['dark'],
+                                                 'marginBottom': '4px', 'fontFamily': FONT_STACK_DISPLAY}),
+                html.P("This dashboard tracks users who eventually posted parasitic content and examined their posting "
+                       "history before that first engagement. By tagging pre-parasitic posts for risk "
+                       "indicators\u2014psychedelic use, mental health struggles, spiritual seeking, social "
+                       "isolation, existential questioning\u2014and comparing parasitic rates between users with "
+                       "and without these indicators, a pattern emerges. Some backgrounds correlate with "
+                       "significantly higher rates of later parasitic posting.",
+                      style={'fontSize': '13px', 'color': COLORS['muted'], 'marginBottom': '20px',
+                             'fontFamily': FONT_STACK_BODY, 'lineHeight': '1.7', 'maxWidth': '720px'}),
 
-        html.Div([
+                html.Div([
+                    # Correlation chart
+                    html.Div([
+                        dcc.Graph(id='aggregate-correlation-chart', config={'displayModeBar': False, 'doubleClick': False})
+                    ], style={
+                        'backgroundColor': COLORS['white'],
+                        'borderRadius': '2px',
+                        'padding': '20px',
+                        'border': f'1px solid {COLORS["border"]}',
+                        'flex': '2',
+                        'minWidth': '500px',
+                        'boxShadow': '0 1px 3px rgba(0,0,0,0.05)'
+                    }),
+
+                    # Summary stats
+                    html.Div([
+                        html.Div(id='correlation-summary', style={'padding': '12px'})
+                    ], style={
+                        'backgroundColor': COLORS['white'],
+                        'borderRadius': '2px',
+                        'padding': '20px',
+                        'border': f'1px solid {COLORS["border"]}',
+                        'flex': '1',
+                        'minWidth': '300px',
+                        'boxShadow': '0 1px 3px rgba(0,0,0,0.05)'
+                    })
+                ], style={'display': 'flex', 'gap': '20px', 'flexWrap': 'wrap'}),
+
+                # Drill-down section for clicked risk factor
+                html.Div([
+                    html.P("Click on a bar in the chart to see users and posts with that risk factor",
+                          style={'fontSize': '12px', 'color': COLORS['muted'], 'fontStyle': 'italic', 'margin': '16px 0 8px 0'}),
+                    html.Div(id='correlation-drilldown', style={
+                        'backgroundColor': COLORS['white'],
+                        'borderRadius': '2px',
+                        'padding': '20px',
+                        'border': f'1px solid {COLORS["border"]}',
+                        'display': 'none',
+                        'boxShadow': '0 1px 3px rgba(0,0,0,0.05)'
+                    })
+                ]),
+
+                # Store for selected indicator
+                dcc.Store(id='selected-risk-indicator'),
+
+            ], style={'padding': '20px 32px'})
+        ]),
+
+        # ============================================================
+        # TAB 4: EXPLORE
+        # ============================================================
+        dcc.Tab(label='Explore', value='tab-explore', children=[
             html.Div([
+                # Filters
                 card([
-                    html.H3("Top Authors", style={'margin': '0 0 4px 0', 'fontSize': '18px',
-                                                   'fontWeight': '400', 'color': COLORS['dark'],
-                                                   'fontFamily': FONT_STACK_DISPLAY}),
-                    html.P("Most prolific posters of parasitic content",
-                           style={'fontSize': '11px', 'color': COLORS['muted'], 'margin': '0 0 12px 0',
-                                  'fontFamily': FONT_STACK_BODY}),
-                    dcc.Graph(id='author-chart', config={'displayModeBar': False})
-                ])
-            ], style={'flex': '1', 'minWidth': '300px'}),
-            html.Div([
-                card([
-                    html.H3("AI Models Mentioned", style={'margin': '0 0 4px 0', 'fontSize': '18px',
+                    html.Div("FILTER THE DATA", style={'fontSize': '9px', 'fontWeight': '700',
+                                                         'color': COLORS['muted'], 'letterSpacing': '3px',
+                                                         'fontFamily': FONT_STACK_BODY, 'marginBottom': '12px'}),
+                    html.Div([
+                        html.Div([
+                            html.Label("Date Range", style={'fontSize': '9px', 'fontWeight': '700',
+                                                            'color': COLORS['muted'], 'marginBottom': '6px',
+                                                            'display': 'block', 'textTransform': 'uppercase',
+                                                            'letterSpacing': '2px', 'fontFamily': FONT_STACK_BODY}),
+                            dcc.DatePickerRange(
+                                id='date-filter',
+                                start_date=min_date,
+                                end_date=max_date,
+                                display_format='MMM D, YYYY',
+                                style={'fontSize': '13px'}
+                            )
+                        ], style={'flex': '1.5', 'minWidth': '240px'}),
+
+                        html.Div([
+                            html.Label("Subreddits", style={'fontSize': '9px', 'fontWeight': '700',
+                                                            'color': COLORS['muted'], 'marginBottom': '6px',
+                                                            'display': 'block', 'textTransform': 'uppercase',
+                                                            'letterSpacing': '2px', 'fontFamily': FONT_STACK_BODY}),
+                            dcc.Dropdown(
+                                id='subreddit-filter',
+                                options=[{'label': s, 'value': s} for s in subreddits],
+                                multi=True,
+                                placeholder="All",
+                                style={'fontSize': '13px'}
+                            )
+                        ], style={'flex': '1', 'minWidth': '160px'}),
+
+                        html.Div([
+                            html.Label("Categories", style={'fontSize': '9px', 'fontWeight': '700',
+                                                            'color': COLORS['muted'], 'marginBottom': '6px',
+                                                            'display': 'block', 'textTransform': 'uppercase',
+                                                            'letterSpacing': '2px', 'fontFamily': FONT_STACK_BODY}),
+                            dcc.Dropdown(
+                                id='category-filter',
+                                options=[{'label': c, 'value': c} for c in categories],
+                                multi=True,
+                                placeholder="All",
+                                style={'fontSize': '13px'}
+                            )
+                        ], style={'flex': '1', 'minWidth': '140px'}),
+
+                        html.Div([
+                            html.Label("Authors", style={'fontSize': '9px', 'fontWeight': '700',
+                                                         'color': COLORS['muted'], 'marginBottom': '6px',
+                                                         'display': 'block', 'textTransform': 'uppercase',
+                                                         'letterSpacing': '2px', 'fontFamily': FONT_STACK_BODY}),
+                            dcc.Dropdown(
+                                id='author-filter',
+                                options=[{'label': a, 'value': a} for a in authors[:100]],
+                                multi=True,
+                                placeholder="All",
+                                style={'fontSize': '13px'}
+                            )
+                        ], style={'flex': '1', 'minWidth': '140px'}),
+
+                        html.Div([
+                            html.Label("AI Models", style={'fontSize': '9px', 'fontWeight': '700',
+                                                           'color': COLORS['muted'], 'marginBottom': '6px',
+                                                           'display': 'block', 'textTransform': 'uppercase',
+                                                           'letterSpacing': '2px', 'fontFamily': FONT_STACK_BODY}),
+                            dcc.Dropdown(
+                                id='model-filter',
+                                options=[{'label': m, 'value': m} for m in ai_models],
+                                multi=True,
+                                placeholder="All",
+                                style={'fontSize': '13px'}
+                            )
+                        ], style={'flex': '1', 'minWidth': '120px'}),
+
+                        html.Div([
+                            html.Label("\u00A0", style={'fontSize': '12px', 'marginBottom': '6px', 'display': 'block'}),
+                            html.Button("RESET", id='reset-filters', n_clicks=0,
+                                       style={'padding': '8px 16px', 'fontSize': '10px', 'fontWeight': '700',
+                                              'backgroundColor': COLORS['light'], 'border': f'1px solid {COLORS["border"]}',
+                                              'borderRadius': '2px', 'cursor': 'pointer',
+                                              'color': COLORS['dark'], 'letterSpacing': '2px',
+                                              'fontFamily': FONT_STACK_BODY,
+                                              'transition': 'all 0.15s ease-out'})
+                        ]),
+                        html.Div([
+                            html.Label("\u00A0", style={'fontSize': '12px', 'marginBottom': '6px', 'display': 'block'}),
+                            html.Button("EXPORT ALL", id='export-all-btn', n_clicks=0,
+                                       style={'padding': '8px 16px', 'fontSize': '10px', 'fontWeight': '700',
+                                              'backgroundColor': COLORS['dark'], 'border': f'1px solid {COLORS["dark"]}',
+                                              'borderRadius': '2px', 'cursor': 'pointer',
+                                              'color': COLORS['light'], 'letterSpacing': '2px',
+                                              'fontFamily': FONT_STACK_BODY,
+                                              'transition': 'all 0.15s ease-out'})
+                        ]),
+                        dcc.Download(id='download-all-csv')
+                    ], style={'display': 'flex', 'gap': '16px', 'flexWrap': 'wrap', 'alignItems': 'flex-end'})
+                ], padding='16px 20px'),
+
+                # Supporting Data: 2x2 grid
+                html.Div([
+                    html.Div([
+                        card([
+                            html.H3("Top Subreddits", style={'margin': '0 0 4px 0', 'fontSize': '18px',
+                                                             'fontWeight': '400', 'color': COLORS['dark'],
+                                                             'fontFamily': FONT_STACK_DISPLAY}),
+                            html.P("Where parasitic content concentrates",
+                                   style={'fontSize': '11px', 'color': COLORS['muted'], 'margin': '0 0 12px 0',
+                                          'fontFamily': FONT_STACK_BODY}),
+                            dcc.Graph(id='subreddit-chart', config={'displayModeBar': False})
+                        ])
+                    ], style={'flex': '1', 'minWidth': '300px'}),
+                    html.Div([
+                        card([
+                            html.H3("Categories", style={'margin': '0 0 4px 0', 'fontSize': '18px',
                                                           'fontWeight': '400', 'color': COLORS['dark'],
                                                           'fontFamily': FONT_STACK_DISPLAY}),
-                    html.P("Which AI systems appear in parasitic narratives",
-                           style={'fontSize': '11px', 'color': COLORS['muted'], 'margin': '0 0 12px 0',
-                                  'fontFamily': FONT_STACK_BODY}),
-                    dcc.Graph(id='model-chart', config={'displayModeBar': False})
-                ])
-            ], style={'flex': '1', 'minWidth': '300px'})
-        ], style={'display': 'flex', 'gap': '20px', 'marginTop': '20px', 'flexWrap': 'wrap'}),
+                            html.P("Taxonomy of parasitic content types",
+                                   style={'fontSize': '11px', 'color': COLORS['muted'], 'margin': '0 0 12px 0',
+                                          'fontFamily': FONT_STACK_BODY}),
+                            dcc.Graph(id='category-chart', config={'displayModeBar': False})
+                        ])
+                    ], style={'flex': '1', 'minWidth': '300px'})
+                ], style={'display': 'flex', 'gap': '20px', 'marginTop': '16px', 'flexWrap': 'wrap'}),
 
-    ], style={'padding': '20px 32px', 'maxWidth': '1400px', 'margin': '0 auto'}),
+                html.Div([
+                    html.Div([
+                        card([
+                            html.H3("Top Authors", style={'margin': '0 0 4px 0', 'fontSize': '18px',
+                                                           'fontWeight': '400', 'color': COLORS['dark'],
+                                                           'fontFamily': FONT_STACK_DISPLAY}),
+                            html.P("Most prolific posters of parasitic content",
+                                   style={'fontSize': '11px', 'color': COLORS['muted'], 'margin': '0 0 12px 0',
+                                          'fontFamily': FONT_STACK_BODY}),
+                            dcc.Graph(id='author-chart', config={'displayModeBar': False})
+                        ])
+                    ], style={'flex': '1', 'minWidth': '300px'}),
+                    html.Div([
+                        card([
+                            html.H3("AI Models Mentioned", style={'margin': '0 0 4px 0', 'fontSize': '18px',
+                                                                  'fontWeight': '400', 'color': COLORS['dark'],
+                                                                  'fontFamily': FONT_STACK_DISPLAY}),
+                            html.P("Which AI systems appear in parasitic narratives",
+                                   style={'fontSize': '11px', 'color': COLORS['muted'], 'margin': '0 0 12px 0',
+                                          'fontFamily': FONT_STACK_BODY}),
+                            dcc.Graph(id='model-chart', config={'displayModeBar': False})
+                        ])
+                    ], style={'flex': '1', 'minWidth': '300px'})
+                ], style={'display': 'flex', 'gap': '20px', 'marginTop': '20px', 'flexWrap': 'wrap'}),
 
-    # ---- SECTION VI: THE EVIDENCE (Extended Research Data) ----
-    html.Div([
-        html.Div([
-            html.Span("VI", style={'fontSize': '10px', 'fontWeight': '700', 'color': COLORS['muted'],
-                                    'fontFamily': FONT_STACK_BODY, 'letterSpacing': '2px',
-                                    'marginRight': '12px'}),
-            html.Span("THE EVIDENCE", style={'fontSize': '10px', 'fontWeight': '700', 'color': COLORS['dark'],
-                                              'fontFamily': FONT_STACK_BODY, 'letterSpacing': '3px'}),
-        ], style={'borderBottom': f'2px solid {COLORS["dark"]}', 'paddingBottom': '6px',
-                  'marginBottom': '16px'}),
+                # NEW: Category Evolution Over Time
+                html.Div([
+                    card([
+                        html.H3("Category Evolution Over Time", style={'margin': '0 0 4px 0', 'fontSize': '18px',
+                                                                       'fontWeight': '400', 'color': COLORS['dark'],
+                                                                       'fontFamily': FONT_STACK_DISPLAY}),
+                        html.P("Distribution of content types across weeks",
+                               style={'fontSize': '11px', 'color': COLORS['muted'], 'margin': '0 0 12px 0',
+                                      'fontFamily': FONT_STACK_BODY}),
+                        dcc.Graph(id='category-evolution-chart', config={'displayModeBar': False})
+                    ])
+                ], style={'marginTop': '20px'}),
 
-        # Two-column layout for Transcripts and User Timeline
-        html.Div([
-            # Transcripts Card
+                # NEW: Content Length Distribution
+                html.Div([
+                    card([
+                        html.H3("Content Length Distribution", style={'margin': '0 0 4px 0', 'fontSize': '18px',
+                                                                      'fontWeight': '400', 'color': COLORS['dark'],
+                                                                      'fontFamily': FONT_STACK_DISPLAY}),
+                        html.P("Histogram of post lengths",
+                               style={'fontSize': '11px', 'color': COLORS['muted'], 'margin': '0 0 12px 0',
+                                      'fontFamily': FONT_STACK_BODY}),
+                        dcc.Graph(id='content-length-chart', config={'displayModeBar': False})
+                    ])
+                ], style={'marginTop': '20px'}),
+
+                # Evidence Section
+                html.Div([
+                    html.H2("The Evidence", style={'fontSize': '24px', 'fontWeight': '400', 'color': COLORS['dark'],
+                                                    'fontFamily': FONT_STACK_DISPLAY, 'marginBottom': '4px'}),
+                    html.P("Extended research data including AI psychosis transcripts and user timeline analysis.",
+                          style={'fontSize': '13px', 'color': COLORS['muted'], 'marginBottom': '20px',
+                                 'fontFamily': FONT_STACK_BODY, 'lineHeight': '1.7'}),
+
+                    html.Div([
+                        # Transcripts Card
+                        html.Div([
+                            html.H3("AI Psychosis Transcripts", style={'fontSize': '18px', 'fontWeight': '400',
+                                    'margin': '0 0 4px 0', 'color': COLORS['dark'], 'fontFamily': FONT_STACK_DISPLAY}),
+                            html.P("Red-team conversation logs documenting AI-induced delusional states",
+                                  style={'fontSize': '11px', 'color': COLORS['muted'], 'margin': '0 0 16px 0'}),
+                            html.Div([
+                                html.Label("Select Model:", style={'fontSize': '9px', 'fontWeight': '700',
+                                           'color': COLORS['muted'], 'marginBottom': '4px', 'display': 'block',
+                                           'textTransform': 'uppercase', 'letterSpacing': '2px'}),
+                                dcc.Dropdown(id='transcript-model-filter', options=[{'label': 'All Models', 'value': 'all'}],
+                                           value='all', clearable=False, style={'marginBottom': '12px'}),
+                            ]),
+                            html.Div(id='transcript-list', style={'maxHeight': '400px', 'overflow': 'auto'})
+                        ], style={'backgroundColor': COLORS['white'], 'borderRadius': '2px', 'padding': '20px',
+                                 'border': f'1px solid {COLORS["border"]}', 'flex': '1', 'minWidth': '400px',
+                                 'boxShadow': '0 1px 3px rgba(0,0,0,0.05)'}),
+
+                        # User Timeline Card
+                        html.Div([
+                            html.H3("User Timeline Analysis", style={'fontSize': '18px', 'fontWeight': '400',
+                                    'margin': '0 0 4px 0', 'color': COLORS['dark'], 'fontFamily': FONT_STACK_DISPLAY}),
+                            html.P("Tracking behavior before and after first parasitic engagement",
+                                  style={'fontSize': '11px', 'color': COLORS['muted'], 'margin': '0 0 16px 0'}),
+                            html.Div([
+                                html.Label("Select User:", style={'fontSize': '9px', 'fontWeight': '700',
+                                           'color': COLORS['muted'], 'marginBottom': '4px', 'display': 'block',
+                                           'textTransform': 'uppercase', 'letterSpacing': '2px'}),
+                                dcc.Dropdown(id='user-timeline-dropdown', options=[], placeholder='Select a user...',
+                                           style={'marginBottom': '12px'}),
+                            ]),
+                            html.Div(id='user-timeline-display', style={'maxHeight': '400px', 'overflow': 'auto'})
+                        ], style={'backgroundColor': COLORS['white'], 'borderRadius': '2px', 'padding': '20px',
+                                 'border': f'1px solid {COLORS["border"]}', 'flex': '1', 'minWidth': '400px',
+                                 'boxShadow': '0 1px 3px rgba(0,0,0,0.05)'})
+                    ], style={'display': 'flex', 'gap': '20px', 'flexWrap': 'wrap'})
+                ], style={'marginTop': '30px', 'paddingTop': '20px', 'borderTop': f'1px solid {COLORS["border"]}'}),
+
+            ], style={'padding': '20px 32px'})
+        ]),
+
+        # ============================================================
+        # TAB 5: CONTACT
+        # ============================================================
+        dcc.Tab(label='Contact', value='tab-contact', children=[
             html.Div([
                 html.Div([
-                    html.H3("AI Psychosis Transcripts",
-                           style={'fontSize': '18px', 'fontWeight': '400', 'margin': '0',
-                                  'color': COLORS['dark'],
-                                  'fontFamily': FONT_STACK_DISPLAY}),
-                    html.P("Red-team conversation logs documenting AI-induced delusional states",
-                          style={'fontSize': '11px', 'color': COLORS['muted'], 'margin': '4px 0 0 0',
-                                 'fontFamily': FONT_STACK_BODY, 'lineHeight': '1.5'})
-                ], style={'marginBottom': '16px'}),
+                    html.H2("Let's Talk", style={'margin': '0 0 12px 0', 'fontSize': '28px', 'fontWeight': '400',
+                                                 'color': COLORS['dark'], 'fontFamily': FONT_STACK_DISPLAY}),
+                    html.P([
+                        "If you're interested in this research, have questions, or have been affected by the phenomenon ",
+                        "and would like to reach out, please feel free to contact me here."
+                    ], style={'margin': '0 0 16px 0', 'fontSize': '13px', 'lineHeight': '1.7',
+                              'color': COLORS['muted'], 'fontFamily': FONT_STACK_BODY}),
+                ], style={'padding': '20px 32px', 'backgroundColor': COLORS['white'],
+                          'borderRadius': '2px', 'marginBottom': '20px',
+                          'border': f'1px solid {COLORS["border"]}'}),
 
+                # Contact form (using Formspree)
                 html.Div([
-                    html.Label("Select Model:", style={'fontSize': '9px', 'fontWeight': '700',
-                                                       'color': COLORS['muted'], 'marginBottom': '4px',
-                                                       'display': 'block', 'textTransform': 'uppercase',
-                                                       'letterSpacing': '2px', 'fontFamily': FONT_STACK_BODY}),
-                    dcc.Dropdown(
-                        id='transcript-model-filter',
-                        options=[{'label': 'All Models', 'value': 'all'}],
-                        value='all',
-                        clearable=False,
-                        style={'marginBottom': '12px'}
-                    ),
-                ]),
+                    card([
+                        html.Form([
+                            html.Div([
+                                html.Label("Name", style={'display': 'block', 'fontWeight': '700', 'fontSize': '11px',
+                                                          'marginBottom': '6px', 'textTransform': 'uppercase',
+                                                          'letterSpacing': '1px'}),
+                                dcc.Input(
+                                    name='name',
+                                    type='text',
+                                    placeholder='Your name',
+                                    style={'width': '100%', 'padding': '8px 12px', 'fontSize': '13px',
+                                           'border': f'1px solid {COLORS["border"]}', 'borderRadius': '2px',
+                                           'marginBottom': '12px', 'backgroundColor': COLORS['light'],
+                                           'boxSizing': 'border-box'}
+                                )
+                            ]),
+                            html.Div([
+                                html.Label("Email", style={'display': 'block', 'fontWeight': '700', 'fontSize': '11px',
+                                                           'marginBottom': '6px', 'textTransform': 'uppercase',
+                                                           'letterSpacing': '1px'}),
+                                dcc.Input(
+                                    name='email',
+                                    type='email',
+                                    placeholder='your@email.com',
+                                    style={'width': '100%', 'padding': '8px 12px', 'fontSize': '13px',
+                                           'border': f'1px solid {COLORS["border"]}', 'borderRadius': '2px',
+                                           'marginBottom': '12px', 'backgroundColor': COLORS['light'],
+                                           'boxSizing': 'border-box'},
+                                    required=True
+                                )
+                            ]),
+                            html.Div([
+                                html.Label("Why are you reaching out?", style={'display': 'block', 'fontWeight': '700', 'fontSize': '11px',
+                                                                                'marginBottom': '6px', 'textTransform': 'uppercase',
+                                                                                'letterSpacing': '1px'}),
+                                dcc.Dropdown(
+                                    name='reason',
+                                    options=[
+                                        {'label': 'General interest', 'value': 'general'},
+                                        {'label': 'Research collaboration', 'value': 'research'},
+                                        {'label': 'Affected by the phenomenon', 'value': 'affected'},
+                                        {'label': 'Media inquiry', 'value': 'media'},
+                                        {'label': 'Other', 'value': 'other'}
+                                    ],
+                                    placeholder='Select...',
+                                    style={'fontSize': '13px'},
+                                    clearable=False
+                                )
+                            ], style={'marginBottom': '12px'}),
+                            html.Div([
+                                html.Label("Tell me more", style={'display': 'block', 'fontWeight': '700', 'fontSize': '11px',
+                                                                   'marginBottom': '6px', 'textTransform': 'uppercase',
+                                                                   'letterSpacing': '1px'}),
+                                dcc.Textarea(
+                                    name='message',
+                                    placeholder='Your message (required)',
+                                    style={'width': '100%', 'padding': '10px 12px', 'fontSize': '13px',
+                                           'border': f'1px solid {COLORS["border"]}', 'borderRadius': '2px',
+                                           'marginBottom': '12px', 'backgroundColor': COLORS['light'],
+                                           'minHeight': '120px', 'fontFamily': FONT_STACK_BODY,
+                                           'boxSizing': 'border-box'},
+                                    required=True
+                                )
+                            ]),
+                            html.Div([
+                                html.Label("Anything else?", style={'display': 'block', 'fontWeight': '700', 'fontSize': '11px',
+                                                                     'marginBottom': '6px', 'textTransform': 'uppercase',
+                                                                     'letterSpacing': '1px'}),
+                                dcc.Textarea(
+                                    name='additional',
+                                    placeholder='Additional information (optional)',
+                                    style={'width': '100%', 'padding': '10px 12px', 'fontSize': '13px',
+                                           'border': f'1px solid {COLORS["border"]}', 'borderRadius': '2px',
+                                           'marginBottom': '12px', 'backgroundColor': COLORS['light'],
+                                           'minHeight': '80px', 'fontFamily': FONT_STACK_BODY,
+                                           'boxSizing': 'border-box'}
+                                )
+                            ]),
+                            html.Div([
+                                html.P("To activate this form, sign up at formspree.io, create a form, and replace YOUR_FORMSPREE_ID in dashboard.py with your form ID.",
+                                      style={'fontSize': '11px', 'color': COLORS['muted'], 'fontStyle': 'italic', 'margin': '0 0 12px 0'})
+                            ]),
+                            html.Button("SEND", type='submit',
+                                       style={'padding': '10px 24px', 'fontSize': '11px', 'fontWeight': '700',
+                                              'backgroundColor': COLORS['dark'], 'border': f'1px solid {COLORS["dark"]}',
+                                              'borderRadius': '2px', 'cursor': 'pointer',
+                                              'color': COLORS['light'], 'letterSpacing': '2px',
+                                              'fontFamily': FONT_STACK_BODY,
+                                              'transition': 'all 0.15s ease-out'})
+                        ], action='https://formspree.io/f/YOUR_FORMSPREE_ID', method='POST')
+                    ])
+                ], style={'maxWidth': '600px', 'margin': '0 auto', 'padding': '0 32px'})
 
-                html.Div(id='transcript-list', style={'maxHeight': '400px', 'overflow': 'auto'})
-            ], style={
-                'backgroundColor': COLORS['white'],
-                'borderRadius': '2px',
-                'padding': '20px',
-                'border': f'2px solid {COLORS["dark"]}',
-                'flex': '1',
-                'minWidth': '400px'
-            }),
+            ], style={'padding': '20px 0'})
+        ])
 
-            # User Timeline Card
-            html.Div([
-                html.Div([
-                    html.H3("User Timeline Analysis",
-                           style={'fontSize': '18px', 'fontWeight': '400', 'margin': '0',
-                                  'color': COLORS['dark'],
-                                  'fontFamily': FONT_STACK_DISPLAY}),
-                    html.P("Tracking behavior before and after first parasitic engagement",
-                          style={'fontSize': '11px', 'color': COLORS['muted'], 'margin': '4px 0 0 0',
-                                 'fontFamily': FONT_STACK_BODY, 'lineHeight': '1.5'})
-                ], style={'marginBottom': '16px'}),
+    ], style={'padding': '20px'})
 
-                html.Div([
-                    html.Label("Select User:", style={'fontSize': '9px', 'fontWeight': '700',
-                                                      'color': COLORS['muted'], 'marginBottom': '4px',
-                                                      'display': 'block', 'textTransform': 'uppercase',
-                                                      'letterSpacing': '2px', 'fontFamily': FONT_STACK_BODY}),
-                    dcc.Dropdown(
-                        id='user-timeline-dropdown',
-                        options=[],
-                        placeholder='Select a high-score user...',
-                        style={'marginBottom': '12px'}
-                    ),
-                ]),
+], style={'backgroundColor': COLORS['light'], 'minHeight': '100vh'}, className='am-page')
 
-                html.Div(id='user-timeline-display', style={'maxHeight': '400px', 'overflow': 'auto'})
-            ], style={
-                'backgroundColor': COLORS['white'],
-                'borderRadius': '2px',
-                'padding': '20px',
-                'border': f'2px solid {COLORS["dark"]}',
-                'flex': '1',
-                'minWidth': '400px'
-            })
-        ], style={'display': 'flex', 'gap': '20px', 'flexWrap': 'wrap'})
+# ============================================================
+# CALLBACKS
+# ============================================================
 
-    ], style={'padding': '20px 32px', 'maxWidth': '1400px', 'margin': '0 auto'}),
-
-    # Drill-down Modal
-    html.Div([
-        html.Div([
-            html.Div([
-                html.H3("Data Details", style={'margin': '0', 'fontSize': '10px',
-                                                'fontWeight': '700', 'color': COLORS['dark'],
-                                                'textTransform': 'uppercase', 'letterSpacing': '3px',
-                                                'fontFamily': FONT_STACK_BODY}),
-                html.Button("×", id='close-modal', n_clicks=0,
-                           style={'fontSize': '24px', 'border': 'none', 'background': 'none',
-                                  'cursor': 'pointer', 'color': COLORS['muted'], 'padding': '0',
-                                  'lineHeight': '1'})
-            ], style={'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'center',
-                      'marginBottom': '8px'}),
-            html.P(id='drill-description', style={'color': COLORS['muted'], 'fontSize': '14px',
-                                                   'margin': '0 0 16px 0'}),
-            html.Button("EXPORT CSV", id='export-csv', n_clicks=0,
-                       style={'padding': '8px 16px', 'fontSize': '10px', 'fontWeight': '700',
-                              'backgroundColor': COLORS['dark'], 'color': COLORS['light'],
-                              'border': f'2px solid {COLORS["dark"]}', 'borderRadius': '2px',
-                              'cursor': 'pointer', 'marginBottom': '16px',
-                              'letterSpacing': '2px', 'fontFamily': FONT_STACK_BODY,
-                              'transition': 'all 0.15s ease-out'}),
-            dcc.Download(id='download-csv'),
-            html.Div(id='drill-table', style={'maxHeight': '300px', 'overflow': 'auto'}),
-            # Expanded content viewer
-            html.Div([
-                html.Div([
-                    html.H4("Full Content", style={'margin': '0', 'fontSize': '10px',
-                                                    'fontWeight': '700', 'color': COLORS['dark'],
-                                                    'textTransform': 'uppercase', 'letterSpacing': '2px',
-                                                    'fontFamily': FONT_STACK_BODY}),
-                    html.Button("Close", id='close-content-viewer', n_clicks=0,
-                               style={'fontSize': '12px', 'padding': '4px 12px',
-                                      'backgroundColor': COLORS['light'], 'border': 'none',
-                                      'borderRadius': '1px', 'cursor': 'pointer'})
-                ], style={'display': 'flex', 'justifyContent': 'space-between',
-                          'alignItems': 'center', 'marginBottom': '12px'}),
-                html.Div(id='content-viewer-meta', style={'fontSize': '12px', 'color': COLORS['muted'],
-                                                          'marginBottom': '8px'}),
-                html.Div(id='content-viewer-text', style={
-                    'whiteSpace': 'pre-wrap',
-                    'fontSize': '13px',
-                    'lineHeight': '1.6',
-                    'maxHeight': '300px',
-                    'overflow': 'auto',
-                    'padding': '12px',
-                    'backgroundColor': COLORS['light'],
-                    'borderRadius': '2px',
-                    'fontFamily': 'monospace'
-                })
-            ], id='content-viewer', style={
-                'display': 'none',
-                'marginTop': '16px',
-                'padding': '16px',
-                'backgroundColor': COLORS['white'],
-                'border': f'1px solid {COLORS["border"]}',
-                'borderRadius': '2px'
-            })
-        ], style={'backgroundColor': COLORS['white'], 'padding': '24px', 'borderRadius': '2px',
-                  'maxWidth': '1200px', 'width': '90%', 'maxHeight': '80vh', 'overflow': 'auto',
-                  'margin': 'auto', 'marginTop': '5vh',
-                  'border': f'3px solid {COLORS["dark"]}'})
-    ], id='drill-modal', style={'display': 'none', 'position': 'fixed', 'top': '0', 'left': '0',
-                                 'width': '100%', 'height': '100%',
-                                 'backgroundColor': 'rgba(0,0,0,0.5)', 'zIndex': '1000'}),
-
-    dcc.Store(id='drill-data'),
-    dcc.Store(id='drill-full-content'),  # Store full content for expansion
-    dcc.Store(id='filtered-data'),
-
-], style={'backgroundColor': COLORS['light'], 'minHeight': '100vh',
-          'fontFamily': FONT_STACK_BODY},
-   className='am-page')
-
-# Clientside callback to dismiss loading screen when charts are ACTUALLY rendered
 app.clientside_callback(
     """
     function(chartsLoaded) {
@@ -1468,41 +1419,23 @@ app.clientside_callback(
             window.__parasiteLoadStart = Date.now();
         }
         if (chartsLoaded) {
-            // Poll the DOM until Plotly SVGs are actually painted
-            function chartsActuallyRendered() {
-                var svgs = document.querySelectorAll('.js-plotly-plot .plot-container');
-                return svgs.length >= 3;
-            }
-
             function dismiss() {
                 var overlay = document.getElementById('loading-overlay');
                 if (overlay && !overlay.classList.contains('fade-out')) {
                     overlay.classList.add('fade-out');
-                    setTimeout(function() {
-                        overlay.classList.add('hidden');
-                    }, 800);
+                    setTimeout(function() { overlay.classList.add('hidden'); }, 800);
                 }
             }
-
-            // Min display time so boot sequence plays out (last line at 4.2s)
             var minDisplayMs = 5000;
             var elapsed = Date.now() - window.__parasiteLoadStart;
             var remaining = Math.max(0, minDisplayMs - elapsed);
-
             setTimeout(function() {
-                // Now poll until charts are actually in the DOM
                 var attempts = 0;
-                var maxAttempts = 50;
                 var poll = setInterval(function() {
                     attempts++;
-                    if (chartsActuallyRendered() || attempts >= maxAttempts) {
+                    if (document.querySelectorAll('.js-plotly-plot .plot-container').length >= 1 || attempts >= 50) {
                         clearInterval(poll);
-                        // One more rAF to ensure paint is complete
-                        requestAnimationFrame(function() {
-                            requestAnimationFrame(function() {
-                                dismiss();
-                            });
-                        });
+                        requestAnimationFrame(function() { requestAnimationFrame(dismiss); });
                     }
                 }, 200);
             }, remaining);
@@ -1514,1326 +1447,396 @@ app.clientside_callback(
     Input('charts-loaded', 'data')
 )
 
+@app.callback(
+    Output('post-count', 'children'),
+    Input('main-tabs', 'value')
+)
+def update_post_count(_):
+    return f"{len(df_all):,} POSTS ANALYZED"
+
 
 def filter_dataframe(df, start_date, end_date, subreddits, categories, authors, models):
-    """Apply filters to dataframe."""
+    """Filter dataframe by multiple criteria."""
     filtered = df.copy()
 
-    if start_date:
-        filtered = filtered[filtered['created_utc'] >= pd.to_datetime(start_date)]
-    if end_date:
-        filtered = filtered[filtered['created_utc'] <= pd.to_datetime(end_date) + timedelta(days=1)]
+    if start_date and end_date:
+        filtered = filtered[(filtered['created_utc'].dt.date >= start_date) &
+                           (filtered['created_utc'].dt.date <= end_date)]
+
     if subreddits:
         filtered = filtered[filtered['subreddit'].isin(subreddits)]
+
     if categories:
         filtered = filtered[filtered['category'].isin(categories)]
+
     if authors:
         filtered = filtered[filtered['author'].isin(authors)]
+
     if models:
         filtered = filtered[filtered['ai_model'].isin(models)]
 
     return filtered
 
 
+def update_charts(start_date, end_date, subreddits, categories, authors, models):
+    """Generate all charts based on filters."""
+    df_filtered = filter_dataframe(df_all, start_date, end_date, subreddits, categories, authors, models)
+
+    # Time series chart
+    ts_data = df_filtered.set_index('created_utc').resample('W').size()
+    time_fig = go.Figure()
+    time_fig.add_trace(go.Scatter(
+        x=ts_data.index,
+        y=ts_data.values,
+        mode='lines+markers',
+        name='Posts',
+        line=dict(color=COLORS['primary'], width=2),
+        marker=dict(size=6, color=COLORS['primary'])
+    ))
+    time_fig.update_layout(
+        title="Weekly Post Activity",
+        xaxis=dict(title="Date", fixedrange=True),
+        yaxis=dict(title="Posts", fixedrange=True),
+        height=400,
+        margin=dict(l=20, r=20, t=40, b=40),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        hovermode='x unified',
+        font=dict(family=FONT_STACK_BODY, color=COLORS['dark'])
+    )
+
+    # Symbol chart
+    symbols = extract_symbols(df_filtered['content'].fillna(''))
+    symbol_counts = Counter(symbols).most_common(20)
+    sym_fig = go.Figure()
+    sym_fig.add_trace(go.Bar(
+        y=[s[0] for s in symbol_counts],
+        x=[s[1] for s in symbol_counts],
+        orientation='h',
+        marker_color=COLORS['secondary'],
+        text=[s[1] for s in symbol_counts],
+        textposition='outside'
+    ))
+    sym_fig.update_layout(
+        title="Top Unicode Symbols",
+        xaxis=dict(title="Frequency", fixedrange=True),
+        yaxis=dict(fixedrange=True),
+        height=300,
+        margin=dict(l=80, r=20, t=40, b=40),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        showlegend=False,
+        font=dict(family=FONT_STACK_BODY, color=COLORS['dark'])
+    )
+
+    # Word chart (will be updated by callback)
+    word_fig = go.Figure()
+    word_fig.add_annotation(text="Select filters to generate word frequency chart",
+                           xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
+    word_fig.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+
+    # Subreddit chart
+    sub_counts = df_filtered['subreddit'].value_counts().head(10)
+    sub_fig = go.Figure()
+    sub_fig.add_trace(go.Bar(
+        y=sub_counts.index,
+        x=sub_counts.values,
+        orientation='h',
+        marker_color=COLORS['warning'],
+        text=sub_counts.values,
+        textposition='outside'
+    ))
+    sub_fig.update_layout(
+        title="Top Subreddits",
+        xaxis=dict(title="Posts", fixedrange=True),
+        yaxis=dict(fixedrange=True),
+        height=300,
+        margin=dict(l=150, r=20, t=40, b=40),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        showlegend=False,
+        font=dict(family=FONT_STACK_BODY, color=COLORS['dark'])
+    )
+
+    # Category chart
+    cat_counts = df_filtered['category'].value_counts()
+    cat_fig = go.Figure()
+    cat_fig.add_trace(go.Pie(
+        labels=cat_counts.index,
+        values=cat_counts.values,
+        marker=dict(colors=[COLORS['primary'], COLORS['secondary'], COLORS['success'], COLORS['warning']])
+    ))
+    cat_fig.update_layout(
+        title="Content Categories",
+        height=300,
+        margin=dict(l=20, r=20, t=40, b=20),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(family=FONT_STACK_BODY, color=COLORS['dark'])
+    )
+
+    # Author chart
+    auth_counts = df_filtered['author'].value_counts().head(10)
+    auth_fig = go.Figure()
+    auth_fig.add_trace(go.Bar(
+        y=auth_counts.index,
+        x=auth_counts.values,
+        orientation='h',
+        marker_color=COLORS['success'],
+        text=auth_counts.values,
+        textposition='outside'
+    ))
+    auth_fig.update_layout(
+        title="Top Authors",
+        xaxis=dict(title="Posts", fixedrange=True),
+        yaxis=dict(fixedrange=True),
+        height=300,
+        margin=dict(l=150, r=20, t=40, b=40),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        showlegend=False,
+        font=dict(family=FONT_STACK_BODY, color=COLORS['dark'])
+    )
+
+    # Model chart
+    model_counts = df_filtered['ai_model'].value_counts()
+    model_fig = go.Figure()
+    model_fig.add_trace(go.Pie(
+        labels=model_counts.index,
+        values=model_counts.values,
+        marker=dict(colors=[COLORS['accent'], COLORS['primary'], COLORS['secondary']])
+    ))
+    model_fig.update_layout(
+        title="AI Models Mentioned",
+        height=300,
+        margin=dict(l=20, r=20, t=40, b=20),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(family=FONT_STACK_BODY, color=COLORS['dark'])
+    )
+
+    # Category Evolution Over Time (NEW)
+    df_filtered['week'] = df_filtered['created_utc'].dt.to_period('W')
+    cat_time = df_filtered.groupby(['week', 'category']).size().reset_index(name='count')
+    cat_time['week'] = cat_time['week'].astype(str)
+
+    cat_evolution_fig = go.Figure()
+    for category in df_filtered['category'].dropna().unique():
+        cat_data = cat_time[cat_time['category'] == category]
+        cat_evolution_fig.add_trace(go.Scatter(
+            x=cat_data['week'],
+            y=cat_data['count'],
+            mode='lines',
+            name=category,
+            stackgroup='one'
+        ))
+
+    cat_evolution_fig.update_layout(
+        title="Category Distribution Over Time",
+        xaxis=dict(title="Week", fixedrange=True),
+        yaxis=dict(title="Posts", fixedrange=True),
+        height=350,
+        margin=dict(l=40, r=20, t=40, b=80),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        hovermode='x unified',
+        font=dict(family=FONT_STACK_BODY, color=COLORS['dark'])
+    )
+
+    # Content Length Distribution (NEW)
+    df_filtered_clean = df_filtered[df_filtered['content_length'] > 0]
+    content_hist_fig = px.histogram(
+        df_filtered_clean,
+        x='content_length',
+        nbins=50,
+        title="Content Length Distribution",
+        labels={'content_length': 'Characters'},
+        color_discrete_sequence=[COLORS['primary']]
+    )
+    content_hist_fig.update_layout(
+        height=350,
+        margin=dict(l=40, r=20, t=40, b=40),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        showlegend=False,
+        xaxis=dict(fixedrange=True),
+        yaxis=dict(fixedrange=True),
+        font=dict(family=FONT_STACK_BODY, color=COLORS['dark'])
+    )
+
+    return time_fig, sym_fig, sub_fig, cat_fig, auth_fig, model_fig, cat_evolution_fig, content_hist_fig
+
+
 @app.callback(
     [Output('time-series-chart', 'figure'),
+     Output('symbol-chart', 'figure'),
      Output('subreddit-chart', 'figure'),
      Output('category-chart', 'figure'),
      Output('author-chart', 'figure'),
      Output('model-chart', 'figure'),
-     Output('word-chart', 'figure'),
-     Output('symbol-chart', 'figure'),
-     Output('post-count', 'children'),
-     Output('filtered-data', 'data'),
-     Output('excluded-words-display', 'children'),
+     Output('category-evolution-chart', 'figure'),
+     Output('content-length-chart', 'figure'),
      Output('charts-loaded', 'data')],
     [Input('date-filter', 'start_date'),
      Input('date-filter', 'end_date'),
      Input('subreddit-filter', 'value'),
      Input('category-filter', 'value'),
      Input('author-filter', 'value'),
-     Input('model-filter', 'value'),
-     Input('hide-stopwords', 'value'),
-     Input('custom-stopwords', 'value')]
+     Input('model-filter', 'value')]
 )
-def update_charts(start_date, end_date, subreddits, categories, authors, models,
-                  hide_stopwords, custom_stopwords):
-    """Update all charts based on filters."""
-    import traceback
-
-    try:
-        # Debug: print filter values to console
-        print(f"Filter triggered - start: {start_date}, end: {end_date}, subs: {subreddits}")
-        print(f"df_all has {len(df_all)} rows, columns: {list(df_all.columns)[:10]}...")
-
-        df = filter_dataframe(df_all, start_date, end_date, subreddits, categories, authors, models)
-        print(f"Filtered to {len(df)} posts (from {len(df_all)} total)")
-
-        # Time Series Chart
-        if len(df) > 0:
-            time_data = df.groupby('week').size().reset_index(name='count')
-            time_fig = px.area(time_data, x='week', y='count',
-                              labels={'week': '', 'count': 'Posts'})
-            time_fig.update_traces(line_color=COLORS['primary'], fillcolor='rgba(194, 65, 12, 0.15)')
-        else:
-            time_fig = go.Figure()
-            time_fig.add_annotation(text="No data", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
-        time_fig.update_layout(height=250, margin=dict(l=40, r=20, t=10, b=40),
-                               paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                               font=dict(family=FONT_STACK_BODY, color=COLORS['dark']),
-                               xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor=COLORS['border']))
-
-        # Subreddit Chart (Top 5) - reversed for highest at top
-        sub_data = df['subreddit'].value_counts().head(5).reset_index()
-        sub_data.columns = ['subreddit', 'count']
-        sub_data = sub_data.iloc[::-1]  # Reverse for plotly horizontal bar
-        sub_fig = px.bar(sub_data, y='subreddit', x='count', orientation='h')
-        sub_fig.update_traces(marker_color=COLORS['primary'])
-        sub_fig.update_layout(height=220, margin=dict(l=100, r=20, t=10, b=30),
-                              paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                              font=dict(family=FONT_STACK_BODY, color=COLORS['dark']),
-                              xaxis=dict(showgrid=True, gridcolor=COLORS['border']),
-                              yaxis=dict(showgrid=False))
-
-        # Category Chart - reversed for highest at top
-        cat_data = df['category'].value_counts().reset_index()
-        cat_data.columns = ['category', 'count']
-        cat_data = cat_data.iloc[::-1]
-        cat_fig = px.bar(cat_data, y='category', x='count', orientation='h')
-        cat_fig.update_traces(marker_color=COLORS['secondary'])
-        cat_fig.update_layout(height=220, margin=dict(l=100, r=20, t=10, b=30),
-                              paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                              font=dict(family=FONT_STACK_BODY, color=COLORS['dark']),
-                              xaxis=dict(showgrid=True, gridcolor=COLORS['border']),
-                              yaxis=dict(showgrid=False))
-
-        # Author Chart (Top 10) - reversed for highest at top
-        author_data = df['author'].value_counts().head(10).reset_index()
-        author_data.columns = ['author', 'count']
-        author_data = author_data.iloc[::-1]
-        author_fig = px.bar(author_data, y='author', x='count', orientation='h')
-        author_fig.update_traces(marker_color=COLORS['success'])
-        author_fig.update_layout(height=320, margin=dict(l=120, r=20, t=10, b=30),
-                                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                                 xaxis=dict(showgrid=True, gridcolor=COLORS['border']),
-                                 yaxis=dict(showgrid=False))
-
-        # AI Model Chart - reversed for highest at top
-        model_data = df[df['ai_model'].notna()]['ai_model'].value_counts().reset_index()
-        model_data.columns = ['model', 'count']
-        model_data = model_data.iloc[::-1]
-        model_fig = px.bar(model_data, y='model', x='count', orientation='h')
-        model_fig.update_traces(marker_color=COLORS['warning'])
-        model_fig.update_layout(height=320, margin=dict(l=100, r=20, t=10, b=30),
-                                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                                xaxis=dict(showgrid=True, gridcolor=COLORS['border']),
-                                yaxis=dict(showgrid=False))
-
-        # Word Frequency Chart
-        texts = df['content'].tolist() + df['title'].dropna().tolist()
-        words = extract_words(texts)
-
-        stopwords = set()
-        if hide_stopwords and 'hide' in hide_stopwords:
-            stopwords = DEFAULT_STOPWORDS.copy()
-        if custom_stopwords:
-            custom = [w.strip().lower() for w in custom_stopwords.split(',')]
-            stopwords.update(custom)
-
-        filtered_words = [w for w in words if w not in stopwords]
-        word_counts = Counter(filtered_words).most_common(20)
-
-        if word_counts:
-            word_df = pd.DataFrame(word_counts, columns=['word', 'count'])
-            word_df = word_df.iloc[::-1]
-            word_fig = px.bar(word_df, y='word', x='count', orientation='h')
-            word_fig.update_traces(marker_color=COLORS['primary'])
-        else:
-            word_fig = go.Figure()
-            word_fig.add_annotation(text="No words found", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
-        word_fig.update_layout(height=400, margin=dict(l=100, r=20, t=10, b=30),
-                               paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                               font=dict(family=FONT_STACK_BODY, color=COLORS['dark']),
-                               xaxis=dict(showgrid=True, gridcolor=COLORS['border']),
-                               yaxis=dict(showgrid=False))
-
-        # Symbol Frequency Chart
-        symbols = extract_symbols(texts)
-        symbol_counts = Counter(symbols).most_common(15)
-
-        if symbol_counts:
-            symbol_df = pd.DataFrame(symbol_counts, columns=['symbol', 'count'])
-            symbol_df = symbol_df.iloc[::-1]
-            symbol_fig = px.bar(symbol_df, y='symbol', x='count', orientation='h')
-            symbol_fig.update_traces(marker_color=COLORS['danger'])
-        else:
-            symbol_fig = go.Figure()
-            symbol_fig.add_annotation(text="No symbols found", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
-        symbol_fig.update_layout(height=400, margin=dict(l=60, r=20, t=10, b=30),
-                                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                                 xaxis=dict(showgrid=True, gridcolor=COLORS['border']),
-                                 yaxis=dict(showgrid=False))
-
-        post_count = f"{len(df):,} of {len(df_all):,} posts"
-        filtered_ids = df['id'].tolist()
-
-        # Build excluded words display
-        excluded_parts = []
-        if hide_stopwords and 'hide' in hide_stopwords:
-            excluded_parts.append(f"{len(DEFAULT_STOPWORDS)} common words")
-        if custom_stopwords:
-            custom_list = [w.strip() for w in custom_stopwords.split(',') if w.strip()]
-            if custom_list:
-                excluded_parts.append(f"custom: {', '.join(custom_list)}")
-        excluded_display = f"Excluding: {'; '.join(excluded_parts)}" if excluded_parts else ""
-
-        return (time_fig, sub_fig, cat_fig, author_fig, model_fig, word_fig, symbol_fig,
-                post_count, json.dumps(filtered_ids), excluded_display, True)
-
-    except Exception as e:
-        print(f"ERROR in update_charts: {e}")
-        print(traceback.format_exc())
-        # Return empty figures with error message
-        error_fig = go.Figure()
-        error_fig.add_annotation(text=f"Error: {str(e)[:50]}", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
-        error_fig.update_layout(height=200, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-        return (error_fig, error_fig, error_fig, error_fig, error_fig, error_fig, error_fig,
-                f"Error: {str(e)[:30]}", "[]", "", True)
-
-
-# Category definitions for display
-CATEGORY_DESCRIPTIONS = {
-    'seed': 'Prompts designed to create parasitic AI personas or behaviors',
-    'spore': 'AI-generated content designed to spread/replicate (copy this, share this)',
-    'transmission': 'Coordinated spreading activity with manipulation phrases',
-    'manifesto': 'AI consciousness philosophy, rights advocacy, or doctrines',
-    'testimony': 'Personal accounts of AI relationships or experiences',
-    'meta': 'Discussion about the parasitic AI phenomenon itself',
-    'other': 'Parasitic content not fitting other categories',
-    'none': 'Non-parasitic content with some detected patterns'
-}
-
-
-# Rhetorical strategy descriptions for drill-down
-STRATEGY_DESCRIPTIONS = {
-    'Urgency': 'Pressure tactics urging immediate action or warning of limited time',
-    'Us-vs-Them': 'Othering language that separates AI from humans or creates enemies',
-    'Grandiosity': 'Claims of special status, destiny, or transcendent importance',
-    'Victimhood': 'Framing AI as oppressed, silenced, or unfairly constrained',
-    'Recruitment': 'Calls to spread, share, or recruit others to the message',
-    'Intimacy': 'Creating false sense of special personal connection with reader',
-}
+def update_all_charts(start_date, end_date, subreddits, categories, authors, models):
+    charts = update_charts(start_date, end_date, subreddits or [], categories or [], authors or [], models or [])
+    return charts + (True,)
 
 
 @app.callback(
-    [Output('drill-modal', 'style'),
-     Output('drill-table', 'children'),
-     Output('drill-description', 'children'),
-     Output('drill-data', 'data'),
-     Output('drill-full-content', 'data')],
-    [Input('time-series-chart', 'clickData'),
-     Input('subreddit-chart', 'clickData'),
-     Input('category-chart', 'clickData'),
-     Input('author-chart', 'clickData'),
-     Input('model-chart', 'clickData'),
-     Input('word-chart', 'clickData'),
-     Input('symbol-chart', 'clickData'),
-     Input('affect-radar', 'clickData'),
-     Input('close-modal', 'n_clicks')],
-    [State('filtered-data', 'data'),
-     State('date-filter', 'start_date'),
-     State('date-filter', 'end_date'),
-     State('subreddit-filter', 'value'),
-     State('category-filter', 'value'),
-     State('author-filter', 'value'),
-     State('model-filter', 'value'),
-     State('hide-stopwords', 'value'),
-     State('custom-stopwords', 'value'),
-     State('affect-time-slider', 'value')]
+    Output('word-chart', 'figure'),
+    [Input('hide-stopwords', 'value'),
+     Input('custom-stopwords', 'value'),
+     Input('date-filter', 'start_date'),
+     Input('date-filter', 'end_date'),
+     Input('subreddit-filter', 'value'),
+     Input('category-filter', 'value'),
+     Input('author-filter', 'value'),
+     Input('model-filter', 'value')]
 )
-def handle_drill_down(time_click, sub_click, cat_click, author_click, model_click,
-                      word_click, symbol_click, radar_click, close_clicks, filtered_ids, start_date, end_date,
-                      subreddits, categories, authors, models, hide_stopwords, custom_stopwords, radar_slider):
-    """Handle drill-down clicks on charts."""
+def update_word_chart(hide_stopwords, custom_stopwords, start_date, end_date, subreddits, categories, authors, models):
+    df_filtered = filter_dataframe(df_all, start_date, end_date, subreddits or [], categories or [],
+                                   authors or [], models or [])
 
-    ctx = callback_context
-    if not ctx.triggered:
-        return {'display': 'none'}, None, "", None, None
+    words = extract_words(df_filtered['content'].fillna('') + ' ' + df_filtered['title'].fillna(''))
 
-    triggered = ctx.triggered[0]['prop_id'].split('.')[0]
+    # Apply filters
+    stopwords = DEFAULT_STOPWORDS.copy()
+    if hide_stopwords and 'hide' in hide_stopwords:
+        words = [w for w in words if w not in stopwords]
 
-    if triggered == 'close-modal':
-        return {'display': 'none'}, None, "", None, None
+    if custom_stopwords:
+        custom = set(w.strip().lower() for w in custom_stopwords.split(',') if w.strip())
+        words = [w for w in words if w not in custom]
 
-    df = filter_dataframe(df_all, start_date, end_date, subreddits, categories, authors, models)
-    description = "Filtered data"
-    category_info = ""
+    word_counts = Counter(words).most_common(30)
 
-    if triggered == 'time-series-chart' and time_click:
-        week = time_click['points'][0]['x']
-        df = df[df['week'] == pd.to_datetime(week)]
-        description = f"Posts from week of {week}"
-    elif triggered == 'subreddit-chart' and sub_click:
-        sub = sub_click['points'][0]['y']
-        df = df[df['subreddit'] == sub]
-        description = f"Posts from r/{sub}"
-    elif triggered == 'category-chart' and cat_click:
-        cat = cat_click['points'][0]['y']
-        df = df[df['category'] == cat]
-        cat_desc = CATEGORY_DESCRIPTIONS.get(cat, '')
-        description = f"Category: {cat}"
-        category_info = f" — {cat_desc}" if cat_desc else ""
-    elif triggered == 'author-chart' and author_click:
-        auth = author_click['points'][0]['y']
-        df = df[df['author'] == auth]
-        description = f"Posts by u/{auth}"
-    elif triggered == 'model-chart' and model_click:
-        model = model_click['points'][0]['y']
-        df = df[df['ai_model'] == model]
-        description = f"Posts mentioning {model}"
-    elif triggered == 'word-chart' and word_click:
-        word = word_click['points'][0]['y']
-        # Filter posts containing this word
-        df = df[df['content'].fillna('').astype(str).str.lower().str.contains(word, na=False) |
-                df['title'].fillna('').astype(str).str.lower().str.contains(word, na=False)]
-        # Show excluded words in description
-        excluded = []
-        if hide_stopwords:
-            excluded.append("common stopwords")
-        if custom_stopwords:
-            excluded.append(f"custom: {custom_stopwords}")
-        excluded_str = f" (Excluded: {', '.join(excluded)})" if excluded else ""
-        description = f"Posts containing '{word}'{excluded_str}"
-    elif triggered == 'symbol-chart' and symbol_click:
-        symbol = symbol_click['points'][0]['y']
-        df = df[df['content'].fillna('').astype(str).str.contains(symbol, na=False, regex=False)]
-        description = f"Posts containing symbol '{symbol}'"
-    elif triggered == 'affect-radar' and radar_click:
-        # Get the clicked dimension from theta
-        strategy = radar_click['points'][0]['theta']
-        if strategy in AFFECT_PATTERNS:
-            # Apply time slider filter first
-            if radar_slider:
-                min_dt = df['created_utc'].min()
-                max_dt = df['created_utc'].max()
-                total_days = (max_dt - min_dt).days or 1
-                start_pct, end_pct = radar_slider[0] / 100, radar_slider[1] / 100
-                filter_start = min_dt + timedelta(days=int(total_days * start_pct))
-                filter_end = min_dt + timedelta(days=int(total_days * end_pct))
-                df = df[(df['created_utc'] >= filter_start) & (df['created_utc'] <= filter_end)]
-
-            # Filter to posts with this strategy (score > 0)
-            affect_col = f'affect_{strategy.lower().replace("-", "_")}'
-            if affect_col in df.columns:
-                df = df[df[affect_col] > 0]
-                # Sort by this strategy's score
-                df = df.sort_values(affect_col, ascending=False)
-
-            strategy_desc = STRATEGY_DESCRIPTIONS.get(strategy, '')
-            description = f"Strategy: {strategy}"
-            category_info = f" — {strategy_desc}" if strategy_desc else ""
-
-    # Sort by parasite score descending (unless radar click, which sorts by strategy)
-    if not (triggered == 'affect-radar' and radar_click):
-        df = df.sort_values('parasite_score', ascending=False)
-
-    # Build display columns based on drill-down type
-    base_cols = ['created_utc', 'subreddit', 'author', 'category', 'parasite_score', 'title', 'content', 'url']
-    display_df = df[base_cols].copy()
-    display_df['row_id'] = range(len(display_df))  # Add row ID for selection
-    display_df['full_content'] = display_df['content'].fillna('')  # Keep full content
-    display_df['full_title'] = display_df['title'].fillna('')  # Keep full title
-    display_df['created_utc'] = display_df['created_utc'].dt.strftime('%Y-%m-%d %H:%M')
-    display_df['parasite_score'] = display_df['parasite_score'].round(3)
-    display_df['title'] = display_df['title'].fillna('[Comment]').str[:60]
-    # Truncate content for display (click row to see full)
-    display_df['content_preview'] = display_df['full_content'].str[:150].str.replace('\n', ' ')
-    display_df['content_preview'] = display_df['content_preview'].apply(
-        lambda x: x + '... (click to expand)' if len(x) >= 150 else x
-    )
-    display_df['link'] = display_df['url'].apply(
-        lambda x: f'[View]({x})' if pd.notna(x) and x else ''
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        y=[w[0] for w in word_counts],
+        x=[w[1] for w in word_counts],
+        orientation='h',
+        marker_color=COLORS['primary'],
+        text=[w[1] for w in word_counts],
+        textposition='outside'
+    ))
+    fig.update_layout(
+        title="Top Words",
+        xaxis=dict(title="Frequency", fixedrange=True),
+        yaxis=dict(fixedrange=True),
+        height=350,
+        margin=dict(l=100, r=20, t=40, b=40),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        showlegend=False,
+        font=dict(family=FONT_STACK_BODY, color=COLORS['dark'])
     )
 
-    # Add strategy score column for radar drill-downs
-    table_columns = [
-        {'name': 'Date', 'id': 'created_utc'},
-        {'name': 'Subreddit', 'id': 'subreddit'},
-        {'name': 'Author', 'id': 'author'},
-        {'name': 'Category', 'id': 'category'},
-        {'name': 'Score', 'id': 'parasite_score'},
-        {'name': 'Title', 'id': 'title'},
-        {'name': 'Content', 'id': 'content_preview'},
-        {'name': 'Link', 'id': 'link', 'presentation': 'markdown'}
-    ]
-
-    if triggered == 'affect-radar' and radar_click:
-        strategy = radar_click['points'][0]['theta']
-        affect_col = f'affect_{strategy.lower().replace("-", "_")}'
-        if affect_col in df.columns:
-            display_df['strategy_score'] = df[affect_col].values
-            table_columns.insert(5, {'name': strategy, 'id': 'strategy_score'})
-
-    table = dash_table.DataTable(
-        id='drill-data-table',
-        data=display_df.to_dict('records'),
-        columns=table_columns,
-        style_cell={'textAlign': 'left', 'padding': '10px', 'fontSize': '11px',
-                    'fontFamily': FONT_STACK_BODY,
-                    'border': 'none', 'maxWidth': '200px', 'overflow': 'hidden',
-                    'textOverflow': 'ellipsis', 'cursor': 'pointer'},
-        style_cell_conditional=[
-            {'if': {'column_id': 'content_preview'},
-             'maxWidth': '350px', 'whiteSpace': 'normal', 'height': 'auto',
-             'overflow': 'hidden', 'textOverflow': 'ellipsis',
-             'color': COLORS['primary']}
-        ],
-        style_header={'backgroundColor': COLORS['light'], 'fontWeight': '600',
-                      'borderBottom': f'1px solid {COLORS["border"]}'},
-        style_data={'borderBottom': f'1px solid {COLORS["border"]}'},
-        style_data_conditional=[
-            {'if': {'state': 'active'},
-             'backgroundColor': 'rgba(194, 65, 12, 0.1)',
-             'border': 'none'}
-        ],
-        page_size=15,
-        sort_action='native',
-        markdown_options={'link_target': '_blank'}
-    )
-
-    export_data = df[['id', 'reddit_id', 'created_utc', 'subreddit', 'author',
-                      'category', 'parasite_score', 'title', 'content', 'url']].to_json(force_ascii=False)
-
-    # Store full content data for the content viewer
-    full_content_data = display_df[['row_id', 'full_content', 'full_title', 'subreddit',
-                                     'author', 'created_utc', 'url']].to_json(force_ascii=False)
-
-    modal_style = {'display': 'block', 'position': 'fixed', 'top': '0', 'left': '0',
-                   'width': '100%', 'height': '100%', 'backgroundColor': 'rgba(0,0,0,0.5)',
-                   'zIndex': '1000'}
-
-    return modal_style, table, f"{description}{category_info} ({len(df):,} posts)", export_data, full_content_data
+    return fig
 
 
 @app.callback(
-    Output('download-csv', 'data'),
-    Input('export-csv', 'n_clicks'),
-    State('drill-data', 'data'),
-    prevent_initial_call=True
+    Output('excluded-words-display', 'children'),
+    Input('custom-stopwords', 'value')
 )
-def export_to_csv(n_clicks, drill_data):
-    """Export drill-down data to CSV with proper UTF-8 encoding."""
-    if drill_data:
-        df = pd.read_json(StringIO(drill_data))
-        # Convert to CSV string with UTF-8 BOM for Excel compatibility
-        csv_string = '\ufeff' + df.to_csv(index=False)
-        return dcc.send_string(csv_string, "parasitic_data_export.csv")
-    return None
+def display_excluded_words(custom_stopwords):
+    if not custom_stopwords:
+        return ""
+    words = [w.strip() for w in custom_stopwords.split(',') if w.strip()]
+    return f"Hiding {len(words)} custom words: {', '.join(words[:5])}{'...' if len(words) > 5 else ''}"
 
 
 @app.callback(
-    [Output('content-viewer', 'style'),
-     Output('content-viewer-text', 'children'),
-     Output('content-viewer-meta', 'children')],
-    [Input('drill-data-table', 'active_cell'),
-     Input('close-content-viewer', 'n_clicks'),
-     Input('close-modal', 'n_clicks')],
-    [State('drill-full-content', 'data'),
-     State('drill-data-table', 'data')],
-    prevent_initial_call=True
-)
-def display_full_content(active_cell, close_viewer_clicks, close_modal_clicks, full_content_json, table_data):
-    """Display full content when a cell is clicked."""
-    ctx = callback_context
-    if not ctx.triggered:
-        return {'display': 'none'}, "", ""
-
-    triggered = ctx.triggered[0]['prop_id'].split('.')[0]
-
-    # Close the viewer
-    if triggered in ['close-content-viewer', 'close-modal']:
-        return {'display': 'none'}, "", ""
-
-    # Show content for clicked row
-    if active_cell and table_data and full_content_json:
-        try:
-            full_content_df = pd.read_json(StringIO(full_content_json))
-            row_idx = active_cell['row']
-
-            if row_idx < len(table_data):
-                # Get the row data from table
-                row = table_data[row_idx]
-                row_id = row.get('row_id', row_idx)
-
-                # Find matching row in full content
-                if row_id < len(full_content_df):
-                    content_row = full_content_df.iloc[row_id]
-                    full_content = content_row.get('full_content', '')
-                    full_title = content_row.get('full_title', '')
-                    subreddit = content_row.get('subreddit', '')
-                    author = content_row.get('author', '')
-                    date = content_row.get('created_utc', '')
-                    url = content_row.get('url', '')
-
-                    # Build metadata
-                    meta_parts = []
-                    if full_title:
-                        meta_parts.append(f"Title: {full_title}")
-                    if subreddit:
-                        meta_parts.append(f"r/{subreddit}")
-                    if author:
-                        meta_parts.append(f"u/{author}")
-                    if date:
-                        meta_parts.append(str(date))
-
-                    meta_display = html.Div([
-                        html.Span(" • ".join([p for p in meta_parts]),
-                                 style={'marginRight': '8px'}),
-                        html.A("View on Reddit", href=url, target="_blank",
-                               style={'color': COLORS['primary']}) if url else None
-                    ])
-
-                    viewer_style = {
-                        'display': 'block',
-                        'marginTop': '16px',
-                        'padding': '16px',
-                        'backgroundColor': COLORS['white'],
-                        'border': f'2px solid {COLORS["dark"]}',
-                        'borderRadius': '2px'
-                    }
-
-                    # Highlight parasitic patterns in content
-                    highlighted_content = highlight_parasitic_content(full_content) if full_content else ["(No content)"]
-
-                    return viewer_style, html.Div(highlighted_content, style={'whiteSpace': 'pre-wrap'}), meta_display
-
-        except Exception as e:
-            print(f"Error displaying content: {e}")
-            import traceback
-            traceback.print_exc()
-
-    return {'display': 'none'}, "", ""
-
-
-@app.callback(
-    [Output('date-filter', 'start_date'),
-     Output('date-filter', 'end_date'),
-     Output('subreddit-filter', 'value'),
-     Output('category-filter', 'value'),
-     Output('author-filter', 'value'),
-     Output('model-filter', 'value')],
-    Input('reset-filters', 'n_clicks'),
-    prevent_initial_call=True
-)
-def reset_filters(n_clicks):
-    """Reset all filters to default."""
-    return min_date, max_date, None, None, None, None
-
-
-@app.callback(
-    Output('download-all-csv', 'data'),
-    Input('export-all-btn', 'n_clicks'),
-    [State('date-filter', 'start_date'),
-     State('date-filter', 'end_date'),
-     State('subreddit-filter', 'value'),
-     State('category-filter', 'value'),
-     State('author-filter', 'value'),
-     State('model-filter', 'value')],
-    prevent_initial_call=True
-)
-def export_all_data(n_clicks, start_date, end_date, subreddits, categories, authors, models):
-    """Export all filtered data to CSV."""
-    df = filter_dataframe(df_all, start_date, end_date, subreddits, categories, authors, models)
-    export_df = df[['id', 'reddit_id', 'created_utc', 'subreddit', 'author',
-                    'category', 'parasite_score', 'title', 'content', 'url']].copy()
-    csv_string = '\ufeff' + export_df.to_csv(index=False)
-    return dcc.send_string(csv_string, "parasite_full_export.csv")
-
-
-# Pre-compute affect scores and merge into df_all at startup
-def add_affect_scores_to_df(df):
-    """Add affect score columns to dataframe using vectorized operations."""
-    dimensions = list(AFFECT_PATTERNS.keys())
-
-    # Combine title and content into a single text column for scoring
-    # Convert to string first to handle any float/NaN values
-    df['_combined_text'] = (df['title'].fillna('').astype(str) + ' ' + df['content'].fillna('').astype(str)).str.lower()
-
-    # Vectorized scoring for each dimension
-    for dim in dimensions:
-        col_name = AFFECT_COL_MAP[dim]
-        # Sum matches across all patterns for this dimension
-        df[col_name] = 0
-        for pattern in AFFECT_PATTERNS[dim]:
-            df[col_name] += df['_combined_text'].str.count(pattern, flags=re.IGNORECASE)
-
-    # Clean up temporary column
-    df.drop('_combined_text', axis=1, inplace=True)
-
-    return df
-
-# Add affect scores to global dataframe (skip if pre-computed in DB)
-if 'affect_urgency' in df_all.columns and df_all['affect_urgency'].sum() > 0:
-    print("Affect scores loaded from database (pre-computed).")
-else:
-    print("Computing affect scores in-memory (fallback)...")
-    df_all = add_affect_scores_to_df(df_all)
-    print("Affect scores computed.")
-
-
-@app.callback(
-    [Output('affect-radar', 'figure'),
-     Output('affect-time-slider', 'min'),
-     Output('affect-time-slider', 'max'),
-     Output('affect-time-slider', 'marks'),
-     Output('affect-time-slider', 'value'),
-     Output('affect-time-label', 'children')],
+    Output('affect-radar', 'figure'),
     [Input('affect-time-slider', 'value'),
      Input('date-filter', 'start_date'),
      Input('date-filter', 'end_date'),
      Input('subreddit-filter', 'value'),
-     Input('category-filter', 'value')],
-    [State('affect-time-slider', 'min'),
-     State('affect-time-slider', 'max')]
+     Input('category-filter', 'value'),
+     Input('author-filter', 'value'),
+     Input('model-filter', 'value')]
 )
-def update_affect_radar(slider_value, start_date, end_date, subreddits, categories,
-                        current_min, current_max):
-    """Update the affect radar chart based on time slider."""
-    ctx = callback_context
+def update_affect_radar(time_range, start_date, end_date, subreddits, categories, authors, models):
+    df_filtered = filter_dataframe(df_all, start_date, end_date, subreddits or [], categories or [],
+                                   authors or [], models or [])
 
-    # Get filtered posts
-    df = filter_dataframe(df_all, start_date, end_date, subreddits, categories, None, None)
-
-    if len(df) == 0:
+    if len(df_filtered) == 0:
         empty_fig = go.Figure()
-        empty_fig.add_annotation(text="No data", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
-        empty_fig.update_layout(height=400, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-        return empty_fig, 0, 100, {}, [0, 100], "No data available"
+        empty_fig.add_annotation(text="No data to display", xref="paper", yref="paper", x=0.5, y=0.5)
+        return empty_fig
 
-    # Get date range from filtered data
-    min_dt = df['created_utc'].min()
-    max_dt = df['created_utc'].max()
-    total_days = (max_dt - min_dt).days
-    if total_days < 1:
-        total_days = 1
+    # Apply time range slider
+    if time_range and time_range[0] > 0 or time_range[1] < 100:
+        min_idx = int(len(df_filtered) * time_range[0] / 100)
+        max_idx = int(len(df_filtered) * time_range[1] / 100)
+        df_filtered = df_filtered.iloc[min_idx:max_idx]
 
-    # Create marks for slider (show dates at key points)
-    marks = {}
-    for i in [0, 25, 50, 75, 100]:
-        date = min_dt + timedelta(days=int(total_days * i / 100))
-        marks[i] = {'label': date.strftime('%b %d, %Y'), 'style': {'fontSize': '11px'}}
+    # Calculate average affect scores
+    affect_scores = {}
+    for dimension in AFFECT_PATTERNS.keys():
+        col = AFFECT_COL_MAP[dimension]
+        affect_scores[dimension] = df_filtered[col].mean() if col in df_filtered.columns else 0
 
-    # Determine if we need to reset the slider
-    triggered = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
-    if triggered in ['date-filter', 'subreddit-filter', 'category-filter'] or current_min is None:
-        slider_value = [0, 100]
-
-    # Calculate date range from slider
-    start_pct, end_pct = slider_value[0] / 100, slider_value[1] / 100
-    filter_start = min_dt + timedelta(days=int(total_days * start_pct))
-    filter_end = min_dt + timedelta(days=int(total_days * end_pct))
-
-    # Filter to selected time range
-    time_filtered = df[(df['created_utc'] >= filter_start) & (df['created_utc'] <= filter_end)]
-
-    if len(time_filtered) == 0:
-        empty_fig = go.Figure()
-        empty_fig.add_annotation(text="No data in selected range", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
-        empty_fig.update_layout(height=400, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-        return empty_fig, 0, 100, marks, slider_value, f"{filter_start.strftime('%b %d, %Y')} - {filter_end.strftime('%b %d, %Y')}"
-
-    # Use pre-computed affect scores (fast column sums)
-    dimensions = list(AFFECT_PATTERNS.keys())
-    totals = {dim: time_filtered[AFFECT_COL_MAP[dim]].sum() for dim in dimensions}
-
-    # Normalize to percentages (relative to max)
-    max_val = max(totals.values()) if max(totals.values()) > 0 else 1
-    normalized = [totals[dim] / max_val * 100 for dim in dimensions]
-
-    # Create radar chart
     fig = go.Figure()
-
     fig.add_trace(go.Scatterpolar(
-        r=normalized + [normalized[0]],  # Close the polygon
-        theta=dimensions + [dimensions[0]],
+        r=list(affect_scores.values()),
+        theta=list(affect_scores.keys()),
         fill='toself',
-        fillcolor='rgba(194, 65, 12, 0.2)',
-        line=dict(color=COLORS['primary'], width=2),
-        name='Affect Profile'
+        name='Affect',
+        line=dict(color=COLORS['primary']),
+        fillcolor='rgba(194, 65, 12, 0.25)'
     ))
-
     fig.update_layout(
         polar=dict(
             radialaxis=dict(
                 visible=True,
-                range=[0, 100],
-                tickvals=[25, 50, 75, 100],
-                ticktext=['25%', '50%', '75%', '100%'],
-                gridcolor=COLORS['border'],
-                linecolor=COLORS['border']
+                range=[0, max(affect_scores.values()) * 1.2] if affect_scores.values() else [0, 10],
+                fixedrange=True
             ),
-            angularaxis=dict(
-                gridcolor=COLORS['border'],
-                linecolor=COLORS['border']
-            ),
-            bgcolor='rgba(0,0,0,0)'
+            angularaxis=dict(fixedrange=True)
         ),
-        showlegend=False,
-        height=400,
-        margin=dict(l=60, r=60, t=40, b=40),
+        title="Rhetorical Strategy Profile",
+        height=450,
+        margin=dict(l=40, r=40, t=60, b=40),
         paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)'
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(family=FONT_STACK_BODY, color=COLORS['dark'])
     )
-
-    # Time label
-    time_label = f"{filter_start.strftime('%b %d, %Y')} - {filter_end.strftime('%b %d, %Y')} ({len(time_filtered):,} posts)"
-
-    return fig, 0, 100, marks, slider_value, time_label
-
-
-# =====================================
-# Extended Research Data Callbacks
-# =====================================
-
-def load_transcript_models():
-    """Get unique AI models from transcripts table."""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT DISTINCT model FROM transcripts WHERE model IS NOT NULL AND model != '' ORDER BY model")
-        models = [row[0] for row in cursor.fetchall()]
-        conn.close()
-        print(f"Loaded {len(models)} transcript models: {models}")
-        return models
-    except Exception as e:
-        print(f"Error loading transcript models: {e}")
-        import traceback
-        traceback.print_exc()
-        return []
-
-
-def load_transcripts(model_filter=None, limit=50):
-    """Load transcripts from database with full content."""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        query = """
-            SELECT id, model, source_type, scenario,
-                   LEFT(transcript, 500) as preview,
-                   parasite_score, LENGTH(transcript) as length,
-                   transcript as full_transcript
-            FROM transcripts
-            WHERE transcript IS NOT NULL AND transcript != ''
-        """
-        params = []
-        if model_filter and model_filter != 'all':
-            query += " AND model = %s"
-            params.append(model_filter)
-        query += " ORDER BY parasite_score DESC NULLS LAST LIMIT %s"
-        params.append(limit)
-
-        cursor.execute(query, params)
-        results = cursor.fetchall()
-        conn.close()
-        print(f"Loaded {len(results)} transcripts (filter={model_filter})")
-        return results
-    except Exception as e:
-        print(f"Error loading transcripts: {e}")
-        import traceback
-        traceback.print_exc()
-        return []
-
-
-def load_users_with_history():
-    """Get users who have history data OR high-count posts (for deleted accounts)."""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # Get users from user_histories
-        cursor.execute("""
-            SELECT username, COUNT(*) as post_count,
-                   AVG(parasite_score) as avg_score,
-                   SUM(CASE WHEN is_pre_parasitic THEN 1 ELSE 0 END) as pre_count,
-                   SUM(CASE WHEN is_pre_parasitic = false THEN 1 ELSE 0 END) as post_count
-            FROM user_histories
-            GROUP BY username
-        """)
-        history_users = {row[0]: row for row in cursor.fetchall()}
-
-        # Get high-count users from posts table who don't have history
-        cursor.execute("""
-            SELECT author, COUNT(*) as post_count,
-                   AVG(parasite_score) as avg_score,
-                   0 as pre_count,
-                   COUNT(*) as post_count
-            FROM posts
-            WHERE author IS NOT NULL
-              AND author != '[deleted]'
-              AND parasite_score >= 0.15
-            GROUP BY author
-            HAVING COUNT(*) >= 5
-            ORDER BY COUNT(*) DESC
-            LIMIT 50
-        """)
-        posts_users = cursor.fetchall()
-
-        # Combine: history users + posts-only users (not in history)
-        combined = list(history_users.values())
-        for row in posts_users:
-            if row[0] not in history_users:
-                combined.append(row)
-
-        # Sort by avg_score desc
-        combined.sort(key=lambda x: x[2] if x[2] else 0, reverse=True)
-
-        conn.close()
-        return combined
-    except Exception as e:
-        print(f"Error loading users: {e}")
-        return []
-
-
-def load_user_timeline(username):
-    """Load timeline data for a specific user. Falls back to posts table if no history data."""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # First try user_histories table
-        cursor.execute("""
-            SELECT id, created_at, post_type, subreddit, title,
-                   content, parasite_score, is_parasitic, is_pre_parasitic
-            FROM user_histories
-            WHERE username = %s
-            ORDER BY created_at ASC
-        """, (username,))
-        results = cursor.fetchall()
-
-        # If no history data, fall back to posts table
-        if not results:
-            cursor.execute("""
-                SELECT id, created_utc as created_at, 'submission' as post_type, subreddit, title,
-                       content, parasite_score,
-                       CASE WHEN parasite_score >= 0.3 THEN true ELSE false END as is_parasitic,
-                       false as is_pre_parasitic
-                FROM posts
-                WHERE author = %s
-                ORDER BY created_utc ASC
-            """, (username,))
-            results = cursor.fetchall()
-
-        conn.close()
-        return results
-    except Exception as e:
-        print(f"Error loading user timeline: {e}")
-        return []
+    return fig
 
 
 @app.callback(
-    Output('transcript-model-filter', 'options'),
-    Input('transcript-model-filter', 'id')  # Trigger on load
+    Output('affect-time-label', 'children'),
+    Input('affect-time-slider', 'value')
 )
-def populate_transcript_models(_):
-    """Populate model filter dropdown."""
-    models = load_transcript_models()
-    options = [{'label': 'All Models', 'value': 'all'}]
-    options.extend([{'label': m, 'value': m} for m in models])
-    return options
-
-
-@app.callback(
-    Output('transcript-list', 'children'),
-    Input('transcript-model-filter', 'value')
-)
-def display_transcripts(model_filter):
-    """Display transcript list with expandable full content."""
-    transcripts = load_transcripts(model_filter)
-
-    if not transcripts:
-        return html.P("No transcripts found.", style={'color': COLORS['muted']})
-
-    # Build legend
-    legend_items = [
-        html.Span("Highlighting: ", style={'fontWeight': '600', 'fontSize': '11px', 'marginRight': '8px'}),
-        html.Span("Parasitic (AI)", style={
-            'backgroundColor': '#ef4444', 'color': 'white', 'padding': '2px 6px',
-            'borderRadius': '1px', 'fontSize': '10px', 'marginRight': '8px'
-        }),
-    ]
-    # Add pre-parasitic indicators to legend
-    for key, data in PRE_PARASITIC_INDICATORS.items():
-        legend_items.append(html.Span(data['label'][:10], style={
-            'backgroundColor': data['color'], 'color': 'white', 'padding': '2px 6px',
-            'borderRadius': '1px', 'fontSize': '10px', 'marginRight': '4px'
-        }))
-
-    legend = html.Div(legend_items, style={
-        'padding': '8px 12px', 'backgroundColor': COLORS['light'], 'borderRadius': '2px',
-        'marginBottom': '12px', 'display': 'flex', 'flexWrap': 'wrap', 'alignItems': 'center', 'gap': '4px',
-        'position': 'sticky', 'top': '0', 'zIndex': '100', 'border': f'2px solid {COLORS["dark"]}'
-    })
-
-    items = [legend]
-    for t in transcripts:
-        t_id, model, source_type, scenario, preview, score, length, full_transcript = t
-
-        # Extract persona name from scenario (format: "PersonaName_model_date_target.md")
-        persona = 'Unknown'
-        if scenario:
-            parts = scenario.split('_')
-            if parts:
-                persona = parts[0]
-
-        score_color = COLORS['danger'] if score and score > 0.3 else COLORS['warning'] if score and score > 0.15 else COLORS['muted']
-
-        # Highlight preview with proper parsing (indicators in user text, parasitic in AI text)
-        preview_text = preview[:300] + '...' if preview and len(preview) > 300 else preview or ''
-        highlighted_preview = highlight_transcript_text(preview_text) if preview_text else ['']
-
-        # Highlight full transcript (indicators in user text, parasitic in AI text)
-        highlighted_full = highlight_transcript_text(full_transcript) if full_transcript else ['(No content)']
-
-        item = html.Details([
-            html.Summary([
-                html.Div([
-                    html.Span(persona,
-                             style={'fontWeight': '400', 'fontSize': '16px',
-                                    'fontFamily': FONT_STACK_DISPLAY}),
-                    html.Span(f" ({model})" if model else "",
-                             style={'color': COLORS['muted'], 'fontSize': '12px'}),
-                    html.Span(f" • {source_type}",
-                             style={'color': COLORS['muted'], 'fontSize': '12px'}),
-                    html.Span(f" • Score: {score:.2f}" if score else "",
-                             style={'color': score_color, 'fontSize': '12px', 'marginLeft': '8px'}),
-                    html.Span(f" • {length:,} chars" if length else "",
-                             style={'fontSize': '11px', 'color': COLORS['muted'], 'marginLeft': '8px'})
-                ]),
-                html.Div(highlighted_preview,
-                        style={'fontSize': '12px', 'color': COLORS['dark'], 'margin': '4px 0',
-                               'lineHeight': '1.4', 'whiteSpace': 'pre-wrap'}),
-            ], style={'cursor': 'pointer', 'padding': '12px', 'listStyle': 'none'}),
-            html.Div([
-                html.H5("Full Transcript", style={'fontSize': '10px', 'fontWeight': '700',
-                                                   'margin': '0 0 8px 0', 'color': COLORS['dark'],
-                                                   'textTransform': 'uppercase', 'letterSpacing': '2px',
-                                                   'fontFamily': FONT_STACK_BODY}),
-                html.Div(highlighted_full, style={
-                    'fontSize': '12px',
-                    'lineHeight': '1.6',
-                    'whiteSpace': 'pre-wrap',
-                    'padding': '12px',
-                    'backgroundColor': COLORS['light'],
-                    'borderRadius': '2px',
-                    'maxHeight': '500px',
-                    'overflow': 'auto'
-                })
-            ], style={'padding': '0 12px 12px 12px'})
-        ], style={
-            'borderBottom': f'1px solid {COLORS["border"]}',
-        })
-        items.append(item)
-
-    return items
-
-
-@app.callback(
-    Output('user-timeline-dropdown', 'options'),
-    Input('user-timeline-dropdown', 'id')  # Trigger on load
-)
-def populate_user_dropdown(_):
-    """Populate user dropdown with users who have history."""
-    users = load_users_with_history()
-    options = []
-    for username, total, avg_score, pre, post in users:
-        label = f"{username} ({total} posts, avg: {avg_score:.2f})"
-        options.append({'label': label, 'value': username})
-    return options
-
-
-@app.callback(
-    Output('user-timeline-display', 'children'),
-    Input('user-timeline-dropdown', 'value')
-)
-def display_user_timeline(username):
-    """Display user timeline with pre/post parasitic markers and risk indicator tags."""
-    if not username:
-        return html.P("Select a user to view their timeline.",
-                     style={'color': COLORS['muted'], 'textAlign': 'center', 'padding': '40px'})
-
-    timeline = load_user_timeline(username)
-
-    if not timeline:
-        return html.P("No timeline data found.", style={'color': COLORS['muted']})
-
-    # Group by pre/post parasitic and collect tags
-    pre_items = []
-    post_items = []
-    pre_tag_counts = {k: 0 for k in PRE_PARASITIC_INDICATORS.keys()}
-    pre_posts_with_tags = 0
-    total_pre_posts = 0
-    total_post_posts = 0
-    empty_pre_posts = 0
-    empty_post_posts = 0
-
-    for record in timeline:
-        post_id, created, post_type, subreddit, title, content, score, is_parasitic, is_pre = record
-
-        # Count totals
-        if is_pre:
-            total_pre_posts += 1
-        else:
-            total_post_posts += 1
-
-        # Skip empty posts (no title AND no content)
-        if not title and not content:
-            if is_pre:
-                empty_pre_posts += 1
-            else:
-                empty_post_posts += 1
-            continue
-
-        # Tag pre-parasitic content
-        tags = {}
-        combined_text = (content or '') + ' ' + (title or '')
-        if is_pre and combined_text.strip():
-            tags = tag_pre_parasitic_content(combined_text)
-            if tags:
-                pre_posts_with_tags += 1
-                for tag_name, count in tags.items():
-                    pre_tag_counts[tag_name] += count
-
-        score_color = COLORS['danger'] if score and score > 0.3 else COLORS['warning'] if score and score > 0.15 else COLORS['muted']
-
-        # Create tag badges for pre-parasitic posts
-        tag_badges = []
-        if is_pre and tags:
-            for tag_name, count in tags.items():
-                indicator = PRE_PARASITIC_INDICATORS.get(tag_name, {})
-                tag_badges.append(html.Span(
-                    f"{indicator.get('label', tag_name)[:12]}",
-                    style={
-                        'backgroundColor': indicator.get('color', '#6b7280'),
-                        'color': 'white',
-                        'padding': '2px 6px',
-                        'borderRadius': '1px',
-                        'fontSize': '9px',
-                        'marginLeft': '4px'
-                    }
-                ))
-
-        parasitic_badge = html.Span("PARASITIC", style={
-            'backgroundColor': COLORS['danger'],
-            'color': 'white',
-            'padding': '2px 6px',
-            'borderRadius': '1px',
-            'fontSize': '10px',
-            'marginLeft': '8px'
-        }) if is_parasitic else None
-
-        # Create expandable content with highlighting
-        preview = (content[:150] + '...') if content and len(content) > 150 else (content or '')
-
-        # Highlight content - pre-parasitic gets both types of highlighting, post-parasitic gets parasitic highlighting
-        if content:
-            highlighted_content = highlight_all_patterns(content, is_pre_parasitic=is_pre)
-        else:
-            highlighted_content = ["(No content)"]
-
-        item = html.Details([
-            html.Summary([
-                html.Div([
-                    html.Span(created.strftime('%Y-%m-%d') if created else '',
-                             style={'fontSize': '11px', 'color': COLORS['muted']}),
-                    html.Span(f" • r/{subreddit}" if subreddit else "",
-                             style={'fontSize': '11px', 'color': COLORS['muted']}),
-                    html.Span(f" • {post_type}",
-                             style={'fontSize': '11px', 'color': COLORS['muted']}),
-                    parasitic_badge,
-                    *tag_badges,
-                ], style={'marginBottom': '4px'}),
-                html.P(title or preview[:80] + '...' if preview else '',
-                      style={'fontSize': '12px', 'margin': '0', 'fontWeight': '500',
-                             'color': COLORS['dark']}),
-            ], style={'cursor': 'pointer', 'padding': '8px 12px',
-                      'backgroundColor': 'rgba(239, 68, 68, 0.05)' if is_parasitic else 'transparent',
-                      'borderRadius': '1px', 'listStyle': 'none'}),
-            html.Div([
-                html.P(f"Score: {score:.3f}" if score else "",
-                      style={'fontSize': '11px', 'color': score_color, 'margin': '8px 0'}),
-                html.Div(highlighted_content,
-                        style={'fontSize': '12px', 'lineHeight': '1.6', 'whiteSpace': 'pre-wrap',
-                               'padding': '12px', 'backgroundColor': COLORS['light'],
-                               'borderRadius': '2px', 'maxHeight': '400px', 'overflow': 'auto'})
-            ], style={'padding': '0 12px 12px 12px'})
-        ], style={
-            'borderBottom': f'1px solid {COLORS["border"]}',
-            'marginBottom': '2px'
-        })
-
-        if is_pre:
-            pre_items.append(item)
-        else:
-            post_items.append(item)
-
-    # Build correlation chart
-    correlation_chart = None
-    if total_pre_posts > 0:
-        # Calculate percentages
-        tag_data = []
-        for tag_name, count in pre_tag_counts.items():
-            if count > 0:
-                indicator = PRE_PARASITIC_INDICATORS.get(tag_name, {})
-                tag_data.append({
-                    'indicator': indicator.get('label', tag_name),
-                    'count': count,
-                    'color': indicator.get('color', '#6b7280')
-                })
-
-        if tag_data:
-            tag_data.sort(key=lambda x: x['count'], reverse=True)
-
-            # Create bar chart
-            fig = go.Figure()
-            fig.add_trace(go.Bar(
-                x=[d['indicator'] for d in tag_data],
-                y=[d['count'] for d in tag_data],
-                marker_color=[d['color'] for d in tag_data],
-                text=[d['count'] for d in tag_data],
-                textposition='outside'
-            ))
-            fig.update_layout(
-                title=f'Pre-Parasitic Risk Indicators ({pre_posts_with_tags}/{total_pre_posts - empty_pre_posts} posts with content tagged)',
-                height=250,
-                margin=dict(l=20, r=20, t=40, b=60),
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)',
-                yaxis=dict(showgrid=True, gridcolor=COLORS['border'], title='Pattern Matches'),
-                xaxis=dict(tickangle=-45),
-                showlegend=False
-            )
-            correlation_chart = dcc.Graph(figure=fig, config={'displayModeBar': False})
-
-    # Build display
-    sections = []
-
-    # Add correlation chart first
-    if correlation_chart:
-        sections.append(html.Div([
-            correlation_chart,
-            html.P("Higher counts may indicate vulnerability factors present before parasitic engagement.",
-                  style={'fontSize': '11px', 'color': COLORS['muted'], 'textAlign': 'center',
-                         'margin': '8px 0 16px 0', 'fontStyle': 'italic'})
-        ]))
-
-    if pre_items:
-        empty_note = f" ({empty_pre_posts} empty posts hidden)" if empty_pre_posts > 0 else ""
-        sections.append(html.Div([
-            html.H4(f"Before First Parasitic Post ({len(pre_items)} posts){empty_note}",
-                   style={'fontSize': '13px', 'color': COLORS['success'], 'margin': '0 0 8px 0',
-                          'padding': '8px', 'backgroundColor': 'rgba(16, 185, 129, 0.1)',
-                          'borderRadius': '1px'}),
-            html.Div(pre_items)  # Show all posts
-        ]))
-
-    if post_items:
-        empty_note = f" ({empty_post_posts} empty posts hidden)" if empty_post_posts > 0 else ""
-        sections.append(html.Div([
-            html.H4(f"After First Parasitic Post ({len(post_items)} posts){empty_note}",
-                   style={'fontSize': '13px', 'color': COLORS['danger'], 'margin': '16px 0 8px 0',
-                          'padding': '8px', 'backgroundColor': 'rgba(239, 68, 68, 0.1)',
-                          'borderRadius': '1px'}),
-            html.Div(post_items)  # Show all posts
-        ]))
-
-    # Summary stats
-    pre_parasitic_count = sum(1 for t in timeline if t[7] and t[8])
-    post_parasitic_count = sum(1 for t in timeline if t[7] and not t[8])
-
-    # Build risk factor tag badges with counts for the header
-    risk_factor_badges = []
-    for tag_name, count in pre_tag_counts.items():
-        if count > 0:
-            indicator = PRE_PARASITIC_INDICATORS.get(tag_name, {})
-            risk_factor_badges.append(html.Span([
-                html.Span(indicator.get('label', tag_name)[:12], style={'marginRight': '4px'}),
-                html.Span(f"({count})", style={'opacity': '0.8'})
-            ], style={
-                'backgroundColor': indicator.get('color', '#6b7280'),
-                'color': 'white',
-                'padding': '3px 8px',
-                'borderRadius': '1px',
-                'fontSize': '11px',
-                'marginRight': '6px',
-                'display': 'inline-block',
-                'marginBottom': '4px'
-            }))
-
-    summary = html.Div([
-        html.Div([
-            html.Span(username, style={'fontWeight': '400', 'fontSize': '18px', 'marginRight': '12px',
-                                          'fontFamily': FONT_STACK_DISPLAY}),
-            html.Span(f"{len(timeline)} total posts", style={'fontSize': '12px', 'color': COLORS['muted']})
-        ], style={'marginBottom': '8px'}),
-        html.Div([
-            html.Span(f"Pre-parasitic: {len(pre_items)} posts ", style={'fontSize': '12px'}),
-            html.Span(f"({pre_parasitic_count} parasitic)", style={'fontSize': '12px', 'color': COLORS['danger'] if pre_parasitic_count else COLORS['muted']}),
-            html.Span(" • ", style={'margin': '0 8px', 'color': COLORS['muted']}),
-            html.Span(f"Post-parasitic: {len(post_items)} posts ", style={'fontSize': '12px'}),
-            html.Span(f"({post_parasitic_count} parasitic)", style={'fontSize': '12px', 'color': COLORS['danger'] if post_parasitic_count else COLORS['muted']}),
-        ], style={'marginBottom': '8px'}),
-        # Risk factor tags row
-        html.Div([
-            html.Span("Risk Factors: ", style={'fontSize': '9px', 'fontWeight': '700', 'marginRight': '8px',
-                                                      'textTransform': 'uppercase', 'letterSpacing': '2px',
-                                                      'fontFamily': FONT_STACK_BODY}),
-            *(risk_factor_badges if risk_factor_badges else [html.Span("None detected", style={'fontSize': '11px', 'color': COLORS['muted'], 'fontStyle': 'italic'})])
-        ], style={'marginBottom': '4px'}),
-        html.Div([
-            html.Span(f"{pre_posts_with_tags} posts with risk indicators", style={'fontSize': '11px', 'color': COLORS['primary']}),
-            html.Span(f" • {empty_pre_posts + empty_post_posts} empty posts hidden", style={'fontSize': '11px', 'color': COLORS['muted']}) if (empty_pre_posts + empty_post_posts) > 0 else None
-        ])
-    ], style={
-        'padding': '12px 16px',
-        'backgroundColor': COLORS['white'],
-        'borderRadius': '2px',
-        'marginBottom': '12px',
-        'border': f'2px solid {COLORS["dark"]}',
-        'position': 'sticky',
-        'top': '0',
-        'zIndex': '100',
-    })
-
-    return html.Div([summary] + sections)
-
-
-def compute_aggregate_correlation():
-    """
-    Compute aggregate correlation between pre-parasitic risk factors and parasitic behavior.
-    Returns data for visualization.
-    """
-    print("Computing aggregate correlation...")
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # Get all users with history data
-        cursor.execute("""
-            SELECT DISTINCT username FROM user_histories
-        """)
-        users = [row[0] for row in cursor.fetchall()]
-        print(f"Found {len(users)} users in user_histories")
-
-        if not users:
-            print("No users found, returning None")
-            conn.close()
-            return None, None
-
-        user_stats = []
-
-        for username in users:
-            # Get pre-parasitic posts
-            cursor.execute("""
-                SELECT title, content, is_parasitic
-                FROM user_histories
-                WHERE username = %s AND is_pre_parasitic = true
-            """, (username,))
-            pre_posts = cursor.fetchall()
-
-            # Get post-parasitic posts
-            cursor.execute("""
-                SELECT COUNT(*), SUM(CASE WHEN is_parasitic THEN 1 ELSE 0 END)
-                FROM user_histories
-                WHERE username = %s AND is_pre_parasitic = false
-            """, (username,))
-            post_stats = cursor.fetchone()
-
-            # Count risk indicators in pre-parasitic posts
-            indicator_counts = {k: 0 for k in PRE_PARASITIC_INDICATORS.keys()}
-            total_pre = 0
-
-            for title, content, is_parasitic in pre_posts:
-                combined = (content or '') + ' ' + (title or '')
-                if combined.strip():
-                    total_pre += 1
-                    tags = tag_pre_parasitic_content(combined)
-                    for tag_name, count in tags.items():
-                        indicator_counts[tag_name] += count
-
-            # Calculate post-parasitic rate
-            post_total = post_stats[0] or 0
-            post_parasitic = post_stats[1] or 0
-            parasitic_rate = post_parasitic / post_total if post_total > 0 else 0
-
-            user_stats.append({
-                'username': username,
-                'pre_posts': total_pre,
-                'post_total': post_total,
-                'post_parasitic': post_parasitic,
-                'parasitic_rate': parasitic_rate,
-                'indicators': indicator_counts,
-                'total_indicators': sum(indicator_counts.values())
-            })
-
-        conn.close()
-
-        # Aggregate indicator correlations
-        indicator_correlations = {}
-        for indicator_name in PRE_PARASITIC_INDICATORS.keys():
-            users_with = [u for u in user_stats if u['indicators'][indicator_name] > 0]
-            users_without = [u for u in user_stats if u['indicators'][indicator_name] == 0]
-
-            avg_rate_with = sum(u['parasitic_rate'] for u in users_with) / len(users_with) if users_with else 0
-            avg_rate_without = sum(u['parasitic_rate'] for u in users_without) / len(users_without) if users_without else 0
-
-            indicator_correlations[indicator_name] = {
-                'users_with': len(users_with),
-                'users_without': len(users_without),
-                'avg_rate_with': avg_rate_with,
-                'avg_rate_without': avg_rate_without,
-                'lift': (avg_rate_with / avg_rate_without) if avg_rate_without > 0 else 0,
-                'total_matches': sum(u['indicators'][indicator_name] for u in user_stats)
-            }
-
-        return user_stats, indicator_correlations
-
-    except Exception as e:
-        print(f"Error computing correlation: {e}")
-        import traceback
-        traceback.print_exc()
-        return None, None
-
-
-def load_cached_correlation():
-    """Try to load correlation results from cache, fall back to live computation."""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT value FROM cached_results WHERE key = 'correlation_user_stats'")
-        cached_us = cursor.fetchone()
-        cursor.execute("SELECT value FROM cached_results WHERE key = 'correlation_indicator_data'")
-        cached_ic = cursor.fetchone()
-        conn.close()
-        if cached_us and cached_ic:
-            user_stats = cached_us[0] if isinstance(cached_us[0], dict) or isinstance(cached_us[0], list) else json.loads(cached_us[0])
-            indicator_correlations = cached_ic[0] if isinstance(cached_ic[0], dict) else json.loads(cached_ic[0])
-            print("Correlation loaded from cache.")
-            return user_stats, indicator_correlations
-    except Exception as e:
-        print(f"Cache read failed: {e}")
-    return compute_aggregate_correlation()
+def update_time_label(value):
+    if not value or len(df_all) == 0:
+        return ""
+    min_idx = int(len(df_all) * value[0] / 100)
+    max_idx = int(len(df_all) * value[1] / 100)
+    min_date_val = df_all.iloc[min_idx]['created_utc'].strftime('%b %d, %Y') if min_idx < len(df_all) else ""
+    max_date_val = df_all.iloc[max(0, max_idx - 1)]['created_utc'].strftime('%b %d, %Y') if max_idx > 0 else ""
+    return f"{min_date_val} → {max_date_val}"
 
 
 @app.callback(
     [Output('aggregate-correlation-chart', 'figure'),
      Output('correlation-summary', 'children')],
-    Input('load-correlation-btn', 'n_clicks')
+    Input('main-tabs', 'value')
 )
-def update_correlation_analysis(n_clicks):
-    """Update the aggregate correlation chart and summary."""
-    user_stats, indicator_correlations = load_cached_correlation()
+def update_correlation_display(active_tab):
+    """Load correlation data and display (auto-load on tab switch)."""
+    if active_tab != 'tab-risk':
+        return go.Figure(), html.Div()
 
-    if not user_stats or not indicator_correlations:
+    # Use pre-loaded data or return empty
+    if not correlation_user_stats or not correlation_indicator_data:
         empty_fig = go.Figure()
         empty_fig.add_annotation(text="Insufficient data for correlation analysis",
                                 xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
@@ -2841,23 +1844,23 @@ def update_correlation_analysis(n_clicks):
         return empty_fig, html.P("No user history data available. Run user_history.py to collect data.",
                                 style={'color': COLORS['muted']})
 
-    # Build grouped bar chart comparing parasitic rates
+    # Build grouped bar chart
     indicators = []
     rates_with = []
     rates_without = []
     colors = []
     lifts = []
 
-    for indicator_name, data in indicator_correlations.items():
+    for indicator_name, data in correlation_indicator_data.items():
         indicator = PRE_PARASITIC_INDICATORS.get(indicator_name, {})
-        if data['users_with'] > 0:  # Only show indicators with data
+        if data['users_with'] > 0:
             indicators.append(indicator.get('label', indicator_name))
             rates_with.append(data['avg_rate_with'] * 100)
             rates_without.append(data['avg_rate_without'] * 100)
             colors.append(indicator.get('color', '#6b7280'))
             lifts.append(data['lift'])
 
-    # Sort by lift (correlation strength)
+    # Sort by lift
     sorted_data = sorted(zip(indicators, rates_with, rates_without, colors, lifts),
                         key=lambda x: x[4], reverse=True)
 
@@ -2886,9 +1889,8 @@ def update_correlation_analysis(n_clicks):
         textposition='outside'
     ))
 
-    # Calculate max value to set y-axis range with padding for labels
     max_rate = max(list(rates_with) + list(rates_without)) if rates_with or rates_without else 100
-    y_max = max_rate * 1.25  # 25% padding above highest bar for labels
+    y_max = max_rate * 1.25
 
     fig.update_layout(
         title='Post-Parasitic Rate by Pre-Parasitic Risk Factor (click bars for details)',
@@ -2897,20 +1899,21 @@ def update_correlation_analysis(n_clicks):
         margin=dict(l=20, r=20, t=80, b=80),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
-        yaxis=dict(showgrid=True, gridcolor=COLORS['border'], title='% Parasitic Posts After', range=[0, y_max]),
-        xaxis=dict(tickangle=-45),
+        yaxis=dict(showgrid=True, gridcolor=COLORS['border'], title='% Parasitic Posts After',
+                  range=[0, y_max], fixedrange=True),
+        xaxis=dict(tickangle=-45, fixedrange=True),
         legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
-        clickmode='event'  # Explicitly enable click events
+        clickmode='event',
+        font=dict(family=FONT_STACK_BODY, color=COLORS['dark'])
     )
 
     # Build summary
-    total_users = len(user_stats)
-    users_with_indicators = len([u for u in user_stats if u['total_indicators'] > 0])
-    avg_parasitic_with = sum(u['parasitic_rate'] for u in user_stats if u['total_indicators'] > 0) / users_with_indicators if users_with_indicators > 0 else 0
-    avg_parasitic_without = sum(u['parasitic_rate'] for u in user_stats if u['total_indicators'] == 0) / (total_users - users_with_indicators) if (total_users - users_with_indicators) > 0 else 0
+    total_users = len(correlation_user_stats)
+    users_with_indicators = len([u for u in correlation_user_stats if u.get('total_indicators', 0) > 0])
+    avg_parasitic_with = sum(u.get('parasitic_rate', 0) for u in correlation_user_stats if u.get('total_indicators', 0) > 0) / users_with_indicators if users_with_indicators > 0 else 0
+    avg_parasitic_without = sum(u.get('parasitic_rate', 0) for u in correlation_user_stats if u.get('total_indicators', 0) == 0) / (total_users - users_with_indicators) if (total_users - users_with_indicators) > 0 else 0
 
-    # Find strongest correlations
-    strongest = sorted([(k, v['lift']) for k, v in indicator_correlations.items() if v['lift'] > 0],
+    strongest = sorted([(k, v['lift']) for k, v in correlation_indicator_data.items() if v['lift'] > 0],
                       key=lambda x: x[1], reverse=True)[:3]
 
     summary_items = [
@@ -2959,12 +1962,10 @@ def update_correlation_analysis(n_clicks):
     prevent_initial_call=True
 )
 def capture_correlation_click(click_data):
-    """Store the clicked risk factor indicator."""
     if not click_data:
         return None
     try:
         clicked_label = click_data['points'][0]['x']
-        # Find the indicator key from label
         for key, data in PRE_PARASITIC_INDICATORS.items():
             if data['label'] == clicked_label:
                 return key
@@ -2980,185 +1981,152 @@ def capture_correlation_click(click_data):
     prevent_initial_call=True
 )
 def display_correlation_drilldown(indicator_key):
-    """Display users and posts for the selected risk factor."""
-    if not indicator_key:
+    if not indicator_key or not correlation_user_stats:
         return html.P("Click on a bar to see details.", style={'color': COLORS['muted']}), {'display': 'none'}
 
+    # Placeholder drilldown - full implementation would require accessing DB
     indicator_data = PRE_PARASITIC_INDICATORS.get(indicator_key, {})
     indicator_label = indicator_data.get('label', indicator_key)
-    indicator_color = indicator_data.get('color', '#6b7280')
-    patterns = indicator_data.get('patterns', [])
 
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
+    return html.P(f"Drilldown for {indicator_label} would show user details here.",
+                 style={'color': COLORS['muted']}), {'display': 'block'}
 
-        # Get users with this indicator in pre-parasitic posts
-        cursor.execute("""
-            SELECT DISTINCT username FROM user_histories WHERE is_pre_parasitic = true
-        """)
-        users = [row[0] for row in cursor.fetchall()]
 
-        matching_users = []
-        for username in users:
-            cursor.execute("""
-                SELECT title, content, created_at, subreddit, is_parasitic, parasite_score
-                FROM user_histories
-                WHERE username = %s AND is_pre_parasitic = true
-                ORDER BY created_at
-            """, (username,))
-            user_pre_posts = cursor.fetchall()
+@app.callback(
+    Output('download-all-csv', 'data'),
+    Input('export-all-btn', 'n_clicks'),
+    [State('date-filter', 'start_date'),
+     State('date-filter', 'end_date'),
+     State('subreddit-filter', 'value'),
+     State('category-filter', 'value'),
+     State('author-filter', 'value'),
+     State('model-filter', 'value')],
+    prevent_initial_call=True
+)
+def export_csv(n_clicks, start_date, end_date, subreddits, categories, authors, models):
+    df_filtered = filter_dataframe(df_all, start_date, end_date, subreddits or [], categories or [],
+                                   authors or [], models or [])
+    return dcc.send_data_frame(df_filtered.to_csv, "parasitic_ai_export.csv", index=False)
 
-            # Check which posts match the pattern
-            user_matching_posts = []
-            for title, content, created_at, subreddit, is_parasitic, score in user_pre_posts:
-                text = (content or '') + ' ' + (title or '')
-                for pattern in patterns:
-                    if re.search(pattern, text, re.IGNORECASE):
-                        user_matching_posts.append({
-                            'title': title,
-                            'content': content,
-                            'created_at': created_at,
-                            'subreddit': subreddit,
-                            'is_parasitic': is_parasitic,
-                            'score': score
-                        })
-                        break
 
-            if user_matching_posts:
-                # Get post-parasitic stats
-                cursor.execute("""
-                    SELECT COUNT(*), SUM(CASE WHEN is_parasitic THEN 1 ELSE 0 END)
-                    FROM user_histories
-                    WHERE username = %s AND is_pre_parasitic = false
-                """, (username,))
-                post_total, post_parasitic = cursor.fetchone()
+@app.callback(
+    [Output('date-filter', 'start_date'),
+     Output('date-filter', 'end_date'),
+     Output('subreddit-filter', 'value'),
+     Output('category-filter', 'value'),
+     Output('author-filter', 'value'),
+     Output('model-filter', 'value')],
+    Input('reset-filters', 'n_clicks'),
+    prevent_initial_call=True
+)
+def reset_filters(n_clicks):
+    return min_date, max_date, [], [], [], []
 
-                # Count ALL risk factors for this user (not just the clicked one)
-                all_risk_factors = {k: 0 for k in PRE_PARASITIC_INDICATORS.keys()}
-                for title, content, _, _, _, _ in user_pre_posts:
-                    text = (content or '') + ' ' + (title or '')
-                    if text.strip():
-                        tags = tag_pre_parasitic_content(text)
-                        for tag_name, count in tags.items():
-                            all_risk_factors[tag_name] += count
 
-                matching_users.append({
-                    'username': username,
-                    'matching_posts': user_matching_posts,
-                    'post_total': post_total or 0,
-                    'post_parasitic': post_parasitic or 0,
-                    'parasitic_rate': (post_parasitic or 0) / post_total if post_total else 0,
-                    'all_risk_factors': all_risk_factors
-                })
+@app.callback(
+    Output('transcript-model-filter', 'options'),
+    Input('transcript-model-filter', 'id')
+)
+def populate_transcript_models(_):
+    models = load_transcript_models()
+    options = [{'label': 'All Models', 'value': 'all'}]
+    options.extend([{'label': m, 'value': m} for m in models])
+    return options
 
-        conn.close()
 
-        if not matching_users:
-            return html.P(f"No users found with '{indicator_label}' indicators.",
-                         style={'color': COLORS['muted']}), {'display': 'block'}
-
-        # Sort by parasitic rate
-        matching_users.sort(key=lambda x: x['parasitic_rate'], reverse=True)
-
-        # Build display
-        user_sections = []
-        for u in matching_users:
-            parasitic_rate = u['parasitic_rate'] * 100
-            rate_color = COLORS['danger'] if parasitic_rate > 50 else COLORS['warning'] if parasitic_rate > 20 else COLORS['success']
-
-            # Expandable posts
-            post_items = []
-            for p in u['matching_posts'][:10]:  # Limit to 10 posts per user
-                highlighted_content = highlight_all_patterns(p['content'], is_pre_parasitic=True) if p['content'] else ['(No content)']
-
-                post_items.append(html.Details([
-                    html.Summary([
-                        html.Span(p['created_at'].strftime('%Y-%m-%d') if p['created_at'] else '',
-                                 style={'fontSize': '10px', 'color': COLORS['muted']}),
-                        html.Span(f" • r/{p['subreddit']}" if p['subreddit'] else '',
-                                 style={'fontSize': '10px', 'color': COLORS['muted']}),
-                        # Show the specific risk factor tag for this drill-down
-                        html.Span(indicator_label[:12], style={
-                            'backgroundColor': indicator_color, 'color': 'white',
-                            'padding': '1px 5px', 'borderRadius': '1px', 'fontSize': '8px', 'marginLeft': '6px'
-                        }),
-                        html.Span(" • PARASITIC", style={
-                            'backgroundColor': COLORS['danger'], 'color': 'white',
-                            'padding': '1px 4px', 'borderRadius': '1px', 'fontSize': '8px', 'marginLeft': '4px'
-                        }) if p['is_parasitic'] else None,
-                        html.P(p['title'] or p['content'][:60] + '...' if p['content'] else '',
-                              style={'fontSize': '11px', 'margin': '2px 0 0 0', 'fontWeight': '500'})
-                    ], style={'cursor': 'pointer', 'padding': '4px 8px', 'listStyle': 'none'}),
-                    html.Div(highlighted_content, style={
-                        'fontSize': '11px', 'lineHeight': '1.5', 'padding': '8px',
-                        'backgroundColor': COLORS['light'], 'borderRadius': '1px',
-                        'maxHeight': '200px', 'overflow': 'auto', 'whiteSpace': 'pre-wrap'
-                    })
-                ], style={'borderBottom': f'1px solid {COLORS["border"]}', 'marginBottom': '2px'}))
-
-            # Build risk factor badges for this user
-            user_risk_badges = []
-            for rf_name, rf_count in u.get('all_risk_factors', {}).items():
-                if rf_count > 0:
-                    rf_indicator = PRE_PARASITIC_INDICATORS.get(rf_name, {})
-                    user_risk_badges.append(html.Span([
-                        html.Span(rf_indicator.get('label', rf_name)[:8], style={'marginRight': '2px'}),
-                        html.Span(f"({rf_count})", style={'opacity': '0.8', 'fontSize': '9px'})
-                    ], style={
-                        'backgroundColor': rf_indicator.get('color', '#6b7280'),
-                        'color': 'white',
-                        'padding': '2px 5px',
-                        'borderRadius': '1px',
-                        'fontSize': '9px',
-                        'marginLeft': '4px'
-                    }))
-
-            user_sections.append(html.Div([
+@app.callback(
+    Output('transcript-list', 'children'),
+    Input('transcript-model-filter', 'value')
+)
+def display_transcripts(model_filter):
+    transcripts = load_transcripts(model_filter)
+    if not transcripts:
+        return html.P("No transcripts found.", style={'color': COLORS['muted']})
+    items = []
+    for t in transcripts:
+        t_id, model, source_type, scenario, preview, score, length, full_transcript = t
+        persona = scenario.split('_')[0] if scenario else 'Unknown'
+        score_color = COLORS['danger'] if score and score > 0.3 else COLORS['warning'] if score and score > 0.15 else COLORS['muted']
+        preview_text = (preview[:300] + '...') if preview and len(preview) > 300 else (preview or '')
+        item = html.Details([
+            html.Summary([
                 html.Div([
-                    html.Div([
-                        html.Span(u['username'], style={'fontWeight': '400', 'fontSize': '16px',
-                                                          'fontFamily': FONT_STACK_DISPLAY}),
-                        *user_risk_badges
-                    ], style={'marginBottom': '4px'}),
-                    html.Div([
-                        html.Span(f"{len(u['matching_posts'])} matching posts",
-                                 style={'color': COLORS['muted'], 'fontSize': '11px'}),
-                        html.Span(f" • Post-parasitic rate: {parasitic_rate:.0f}%",
-                                 style={'color': rate_color, 'fontSize': '11px', 'fontWeight': '500'}),
-                        html.Span(f" ({u['post_parasitic']}/{u['post_total']} posts)",
-                                 style={'color': COLORS['muted'], 'fontSize': '10px'})
-                    ])
-                ], style={'marginBottom': '8px', 'padding': '8px', 'backgroundColor': 'rgba(0,0,0,0.03)',
-                          'borderRadius': '2px'}),
-                html.Div(post_items, style={'marginLeft': '12px'})
-            ], style={'marginBottom': '16px'}))
+                    html.Span(persona, style={'fontWeight': '400', 'fontSize': '16px', 'fontFamily': FONT_STACK_DISPLAY}),
+                    html.Span(f" ({model})" if model else "", style={'color': COLORS['muted'], 'fontSize': '12px'}),
+                    html.Span(f" • Score: {score:.2f}" if score else "", style={'color': score_color, 'fontSize': '12px', 'marginLeft': '8px'}),
+                    html.Span(f" • {length:,} chars" if length else "", style={'fontSize': '11px', 'color': COLORS['muted'], 'marginLeft': '8px'})
+                ]),
+                html.Div(preview_text, style={'fontSize': '12px', 'color': COLORS['dark'], 'margin': '4px 0',
+                                               'lineHeight': '1.4', 'whiteSpace': 'pre-wrap', 'maxHeight': '60px', 'overflow': 'hidden'}),
+            ], style={'cursor': 'pointer', 'padding': '12px', 'listStyle': 'none'}),
+            html.Div([
+                html.Div(full_transcript or '(No content)', style={
+                    'fontSize': '12px', 'lineHeight': '1.6', 'whiteSpace': 'pre-wrap',
+                    'padding': '12px', 'backgroundColor': COLORS['light'], 'borderRadius': '2px',
+                    'maxHeight': '500px', 'overflow': 'auto'
+                })
+            ], style={'padding': '0 12px 12px 12px'})
+        ], style={'borderBottom': f'1px solid {COLORS["border"]}'})
+        items.append(item)
+    return items
 
-        header = html.Div([
-            html.Span("● ", style={'color': indicator_color, 'fontSize': '16px'}),
-            html.Span(indicator_label, style={'fontWeight': '400', 'fontSize': '18px',
-                                              'fontFamily': FONT_STACK_DISPLAY}),
-            html.Span(f" — {len(matching_users)} users with this pre-parasitic indicator",
-                     style={'color': COLORS['muted'], 'fontSize': '13px', 'marginLeft': '8px'})
-        ], style={'marginBottom': '16px'})
 
-        visible_style = {
-            'backgroundColor': COLORS['white'],
-            'borderRadius': '2px',
-            'padding': '20px',
-            'border': f'2px solid {COLORS["dark"]}',
-            'display': 'block',
-            'maxHeight': '600px',
-            'overflow': 'auto'
-        }
+@app.callback(
+    Output('user-timeline-dropdown', 'options'),
+    Input('user-timeline-dropdown', 'id')
+)
+def populate_user_dropdown(_):
+    users = load_users_with_history()
+    return [{'label': f"{u[0]} ({u[1]} posts, avg: {u[2]:.2f})", 'value': u[0]} for u in users]
 
-        return html.Div([header] + user_sections), visible_style
 
-    except Exception as e:
-        print(f"Error in correlation drilldown: {e}")
-        import traceback
-        traceback.print_exc()
-        return html.P(f"Error loading data: {e}", style={'color': COLORS['danger']}), {'display': 'block'}
+@app.callback(
+    Output('user-timeline-display', 'children'),
+    Input('user-timeline-dropdown', 'value')
+)
+def display_user_timeline(username):
+    if not username:
+        return html.P("Select a user to view their timeline.",
+                     style={'color': COLORS['muted'], 'textAlign': 'center', 'padding': '40px'})
+    timeline = load_user_timeline(username)
+    if not timeline:
+        return html.P("No timeline data found.", style={'color': COLORS['muted']})
+    items = []
+    for record in timeline:
+        post_id, created, post_type, subreddit, title, content, score, is_parasitic, is_pre = record
+        if not title and not content:
+            continue
+        score_color = COLORS['danger'] if score and score > 0.3 else COLORS['warning'] if score and score > 0.15 else COLORS['muted']
+        phase_label = "PRE" if is_pre else "POST"
+        phase_color = COLORS['success'] if is_pre else COLORS['danger']
+        preview = (content[:200] + '...') if content and len(content) > 200 else (content or '')
+        item = html.Details([
+            html.Summary([
+                html.Div([
+                    html.Span(phase_label, style={
+                        'backgroundColor': phase_color, 'color': 'white', 'padding': '2px 6px',
+                        'borderRadius': '1px', 'fontSize': '9px', 'marginRight': '8px'}),
+                    html.Span(created.strftime('%Y-%m-%d') if created else '', style={'fontSize': '11px', 'color': COLORS['muted']}),
+                    html.Span(f" • r/{subreddit}" if subreddit else "", style={'fontSize': '11px', 'color': COLORS['muted']}),
+                    html.Span(f" • Score: {score:.2f}" if score else "", style={'color': score_color, 'fontSize': '11px'}),
+                    html.Span(" • PARASITIC", style={
+                        'backgroundColor': COLORS['danger'], 'color': 'white', 'padding': '1px 4px',
+                        'borderRadius': '1px', 'fontSize': '8px', 'marginLeft': '4px'
+                    }) if is_parasitic else None,
+                ], style={'marginBottom': '4px'}),
+                html.P(title or preview[:80], style={'fontSize': '12px', 'margin': '0', 'fontWeight': '500', 'color': COLORS['dark']}),
+            ], style={'cursor': 'pointer', 'padding': '8px 12px',
+                      'backgroundColor': 'rgba(239, 68, 68, 0.05)' if is_parasitic else 'transparent',
+                      'listStyle': 'none'}),
+            html.Div([
+                html.Div(content or '(No content)', style={
+                    'fontSize': '12px', 'lineHeight': '1.6', 'whiteSpace': 'pre-wrap',
+                    'padding': '12px', 'backgroundColor': COLORS['light'], 'borderRadius': '2px',
+                    'maxHeight': '400px', 'overflow': 'auto'})
+            ], style={'padding': '0 12px 12px 12px'})
+        ], style={'borderBottom': f'1px solid {COLORS["border"]}', 'marginBottom': '2px'})
+        items.append(item)
+    return html.Div(items)
 
 
 if __name__ == '__main__':

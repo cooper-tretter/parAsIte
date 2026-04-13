@@ -7,36 +7,6 @@
 /* Typography — editorial, eclectic, intentional */
 @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Instrument+Serif&family=Space+Mono:wght@400;700&family=JetBrains+Mono:wght@400;700&display=swap');
 
-/* ---- TEXTURE: Paper grain overlay on entire page ---- */
-.am-page {
-    position: relative;
-}
-
-.am-page::before {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    pointer-events: none;
-    z-index: 9000;
-    opacity: 0.04;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-    background-repeat: repeat;
-    background-size: 256px 256px;
-}
-
-/* ---- CARD texture & hover ---- */
-.am-card {
-    position: relative;
-    transition: transform 0.15s ease-out, border-color 0.15s ease-out;
-}
-
-.am-card:hover {
-    border-color: #c2410c !important;
-}
-
 /* ---- GLOBAL TYPOGRAPHY ---- */
 
 /* All headings get the serif display treatment */
@@ -49,7 +19,7 @@ body, p, span, label, a, input, select, button, td, th {
     font-family: 'Space Mono', 'JetBrains Mono', 'Courier New', monospace;
 }
 
-/* ---- LINKS: underline with offset, no color-change hover ---- */
+/* ---- LINKS: underline with offset, subtle hover ---- */
 a {
     text-decoration-thickness: 1px;
     text-underline-offset: 3px;
@@ -74,24 +44,22 @@ button:active {
     transform: translateY(0);
 }
 
-/* ---- BORDERS: visible, intentional ---- */
-/* Override Dash's default thin borders */
+/* ---- BORDERS: subtle, 1px ---- */
 .dash-table-container .dash-spreadsheet-container {
-    border: 2px solid #1c1917 !important;
+    border: 1px solid #a8a29e !important;
     border-radius: 2px !important;
 }
 
 .dash-header {
     font-family: 'Space Mono', 'JetBrains Mono', monospace !important;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-size: 10px !important;
-    font-weight: 700 !important;
+    font-size: 11px !important;
+    font-weight: 400 !important;
+    letter-spacing: 0.5px;
 }
 
 /* ---- DROPDOWNS: styled to match ---- */
 .Select-control {
-    border: 2px solid #1c1917 !important;
+    border: 1px solid #a8a29e !important;
     border-radius: 2px !important;
     font-family: 'Space Mono', monospace !important;
     font-size: 12px !important;
@@ -99,7 +67,7 @@ button:active {
 }
 
 .Select-menu-outer {
-    border: 2px solid #1c1917 !important;
+    border: 1px solid #a8a29e !important;
     border-radius: 2px !important;
     background-color: #ece5d5 !important;
 }
@@ -122,7 +90,7 @@ button:active {
 .DateInput_input {
     font-family: 'Space Mono', monospace !important;
     font-size: 12px !important;
-    border: 2px solid #1c1917 !important;
+    border: 1px solid #a8a29e !important;
     border-radius: 2px !important;
     background-color: #ece5d5 !important;
     padding: 6px 10px !important;
@@ -150,7 +118,6 @@ button:active {
 ::-webkit-scrollbar-thumb {
     background: #a8a29e;
     border-radius: 0;
-    border: 1px solid #1c1917;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -161,6 +128,7 @@ button:active {
 details summary {
     font-family: 'Space Mono', monospace;
     transition: background-color 0.15s ease-out;
+    cursor: pointer;
 }
 
 details summary:hover {
@@ -179,15 +147,17 @@ details[open] summary {
 }
 
 /* ---- INPUT FIELDS ---- */
-input[type="text"] {
+input[type="text"],
+textarea {
     font-family: 'Space Mono', monospace !important;
-    border: 2px solid #1c1917 !important;
+    border: 1px solid #a8a29e !important;
     border-radius: 2px !important;
     background-color: #ece5d5 !important;
     transition: border-color 0.15s ease-out;
 }
 
-input[type="text"]:focus {
+input[type="text"]:focus,
+textarea:focus {
     border-color: #c2410c !important;
     outline: none !important;
 }
@@ -200,7 +170,7 @@ input[type="text"]:focus {
 .rc-slider-handle {
     border-color: #1c1917 !important;
     background-color: #ece5d5 !important;
-    border-width: 2px !important;
+    border-width: 1px !important;
 }
 
 .rc-slider-handle:hover {
@@ -211,10 +181,48 @@ input[type="text"]:focus {
     background-color: #a8a29e !important;
 }
 
-/* ---- SECTION DIVIDERS: hard cuts ---- */
-/* Padding sections get visible top borders for rhythm */
-div[style*="padding: 20px 32px"] + div[style*="padding: 20px 32px"] {
-    border-top: 2px solid #1c1917;
+/* ---- CARD styling with subtle shadow ---- */
+.am-card {
+    position: relative;
+    transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+}
+
+.am-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08) !important;
+}
+
+/* ---- TABS: clean styling ---- */
+.rc-tabs {
+    background-color: transparent !important;
+}
+
+.rc-tabs-tab {
+    padding: 12px 20px !important;
+    font-family: 'Space Mono', monospace !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    border: 1px solid #a8a29e !important;
+    border-radius: 2px 2px 0 0 !important;
+    margin-right: 2px !important;
+    background-color: #ece5d5 !important;
+    color: #57534e !important;
+    transition: all 0.15s ease-out;
+}
+
+.rc-tabs-tab:hover {
+    background-color: #f5f0e6 !important;
+    color: #c2410c !important;
+}
+
+.rc-tabs-tab-active {
+    background-color: #ece5d5 !important;
+    color: #c2410c !important;
+    border-bottom: 2px solid #c2410c !important;
+}
+
+.rc-tabs-content {
+    background-color: transparent !important;
 }
 
 /* ---- PLOTLY CHART OVERRIDES ---- */
@@ -245,7 +253,6 @@ div[style*="padding: 20px 32px"] + div[style*="padding: 20px 32px"] {
 .am-card:nth-child(4) { animation-delay: 180ms; }
 
 /* ---- BADGE / TAG overrides ---- */
-/* Make tag badges feel more like stamps */
 span[style*="borderRadius: 3px"],
 span[style*="borderRadius: 4px"] {
     border-radius: 1px !important;
@@ -253,29 +260,159 @@ span[style*="borderRadius: 4px"] {
     letter-spacing: 0.5px;
 }
 
-/* ---- EDITORIAL: Drop-cap pull ---- */
-/* Ensure drop cap floats cleanly */
-.am-page p span[style*="float: left"] {
-    font-weight: 400;
-}
-
-/* ---- EDITORIAL: Section marker rhythm ---- */
-/* The roman-numeral section headers get a subtle top margin */
-.am-page > div > div > div[style*="borderBottom: 2px solid"] {
-    margin-top: 48px;
-}
-.am-page > div > div > div[style*="borderBottom: 2px solid"]:first-child {
-    margin-top: 32px;
-}
-
-/* ---- EDITORIAL: Chart card hover lift ---- */
-.am-card:hover {
-    transform: translateY(-2px);
-    border-color: #c2410c !important;
-}
-
-/* ---- EDITORIAL: Subtle selection color ---- */
+/* ---- EDITORIAL: Selection color ---- */
 ::selection {
     background-color: rgba(194, 65, 12, 0.2);
     color: inherit;
+}
+
+/* ---- RETRO CRT LOADING SCREEN ---- */
+
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    z-index: 10000;
+    font-family: 'Space Mono', 'JetBrains Mono', monospace;
+    color: #00ff00;
+    text-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+    animation: crt-flicker 0.15s infinite;
+}
+
+@keyframes crt-flicker {
+    0%, 100% { opacity: 0.97; }
+    50% { opacity: 0.99; }
+}
+
+.crt-vignette {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.4) 100%);
+    pointer-events: none;
+}
+
+.ascii-art {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.2;
+    white-space: pre;
+    color: #00ff00;
+    text-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+    margin: 0;
+    margin-bottom: 20px;
+    animation: scanlines 8ms linear infinite;
+}
+
+@keyframes scanlines {
+    0% { text-shadow: 0 0 10px rgba(0, 255, 0, 0.3); }
+    50% { text-shadow: 0 0 20px rgba(0, 255, 0, 0.5), 0 0 30px rgba(0, 255, 0, 0.2); }
+}
+
+.boot-title {
+    font-size: 20px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    margin-bottom: 20px;
+    color: #00ff00;
+    text-shadow: 0 0 10px rgba(0, 255, 0, 0.4);
+}
+
+.boot-text {
+    margin-bottom: 30px;
+    text-align: left;
+    min-width: 400px;
+}
+
+.line {
+    font-size: 12px;
+    margin: 4px 0;
+    opacity: 0;
+    animation: boot-line 0.5s ease-in forwards;
+}
+
+@keyframes boot-line {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.status-loading::after {
+    content: '█';
+    animation: blink 0.5s infinite;
+}
+
+@keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+}
+
+.progress-container {
+    width: 400px;
+    margin-bottom: 30px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.progress-label {
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.progress-track {
+    flex: 1;
+    height: 4px;
+    background: #333;
+    border: 1px solid #00ff00;
+    position: relative;
+    overflow: hidden;
+}
+
+.progress-track::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    background: linear-gradient(90deg, #00ff00, #00aa00);
+    animation: progress-fill 5s ease-in-out forwards;
+}
+
+@keyframes progress-fill {
+    0% { width: 0%; }
+    100% { width: 100%; }
+}
+
+.boot-version {
+    font-size: 10px;
+    opacity: 0.7;
+    letter-spacing: 2px;
+}
+
+/* Hide loading screen after delay */
+.loading-overlay.hidden {
+    display: none;
+}
+
+/* ---- AM-PAGE wrapper ---- */
+.am-page {
+    background-color: #F5F0E8;
+    min-height: 100vh;
+}
+
+/* ---- RESPONSIVE ---- */
+@media (max-width: 768px) {
+    .rc-tabs-tab {
+        padding: 10px 12px !important;
+        font-size: 11px !important;
+    }
 }
