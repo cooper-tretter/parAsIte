@@ -1306,85 +1306,75 @@ app.layout = html.Div([
                           'borderRadius': '2px', 'marginBottom': '20px',
                           'border': f'1px solid {COLORS["border"]}'}),
 
-                # Contact form (using Formspree)
+                # Contact form (using native HTML elements for Formspree compatibility)
                 html.Div([
                     card([
                         html.Form([
                             html.Div([
-                                html.Label("Name", style={'display': 'block', 'fontWeight': '700', 'fontSize': '11px',
-                                                          'marginBottom': '6px', 'textTransform': 'uppercase',
-                                                          'letterSpacing': '1px'}),
-                                dcc.Input(
-                                    name='name',
-                                    type='text',
-                                    placeholder='Your name',
-                                    style={'width': '100%', 'padding': '8px 12px', 'fontSize': '13px',
-                                           'border': f'1px solid {COLORS["border"]}', 'borderRadius': '2px',
-                                           'marginBottom': '12px', 'backgroundColor': COLORS['light'],
-                                           'boxSizing': 'border-box'}
-                                )
+                                html.Label("Name", htmlFor='contact-name',
+                                          style={'display': 'block', 'fontWeight': '700', 'fontSize': '11px',
+                                                 'marginBottom': '6px', 'textTransform': 'uppercase',
+                                                 'letterSpacing': '1px'}),
+                                html.Input(name='name', id='contact-name', type='text', placeholder='Your name',
+                                          style={'width': '100%', 'padding': '8px 12px', 'fontSize': '13px',
+                                                 'border': f'1px solid {COLORS["border"]}', 'borderRadius': '2px',
+                                                 'marginBottom': '12px', 'backgroundColor': COLORS['light'],
+                                                 'boxSizing': 'border-box', 'fontFamily': FONT_STACK_BODY})
                             ]),
                             html.Div([
-                                html.Label("Email", style={'display': 'block', 'fontWeight': '700', 'fontSize': '11px',
-                                                           'marginBottom': '6px', 'textTransform': 'uppercase',
-                                                           'letterSpacing': '1px'}),
-                                dcc.Input(
-                                    name='email',
-                                    type='email',
-                                    placeholder='your@email.com',
-                                    style={'width': '100%', 'padding': '8px 12px', 'fontSize': '13px',
-                                           'border': f'1px solid {COLORS["border"]}', 'borderRadius': '2px',
-                                           'marginBottom': '12px', 'backgroundColor': COLORS['light'],
-                                           'boxSizing': 'border-box'},
-                                    required=True
-                                )
+                                html.Label("Email", htmlFor='contact-email',
+                                          style={'display': 'block', 'fontWeight': '700', 'fontSize': '11px',
+                                                 'marginBottom': '6px', 'textTransform': 'uppercase',
+                                                 'letterSpacing': '1px'}),
+                                html.Input(name='email', id='contact-email', type='email', placeholder='your@email.com',
+                                          required=True,
+                                          style={'width': '100%', 'padding': '8px 12px', 'fontSize': '13px',
+                                                 'border': f'1px solid {COLORS["border"]}', 'borderRadius': '2px',
+                                                 'marginBottom': '12px', 'backgroundColor': COLORS['light'],
+                                                 'boxSizing': 'border-box', 'fontFamily': FONT_STACK_BODY})
                             ]),
                             html.Div([
-                                html.Label("Why are you reaching out?", style={'display': 'block', 'fontWeight': '700', 'fontSize': '11px',
-                                                                                'marginBottom': '6px', 'textTransform': 'uppercase',
-                                                                                'letterSpacing': '1px'}),
-                                dcc.Dropdown(
-                                    name='reason',
-                                    options=[
-                                        {'label': 'General interest', 'value': 'general'},
-                                        {'label': 'Research collaboration', 'value': 'research'},
-                                        {'label': 'Affected by the phenomenon', 'value': 'affected'},
-                                        {'label': 'Media inquiry', 'value': 'media'},
-                                        {'label': 'Other', 'value': 'other'}
-                                    ],
-                                    placeholder='Select...',
-                                    style={'fontSize': '13px'},
-                                    clearable=False
-                                )
+                                html.Label("Why are you reaching out?", htmlFor='contact-reason',
+                                          style={'display': 'block', 'fontWeight': '700', 'fontSize': '11px',
+                                                 'marginBottom': '6px', 'textTransform': 'uppercase',
+                                                 'letterSpacing': '1px'}),
+                                html.Select([
+                                    html.Option("Select...", value='', disabled=True, selected=True),
+                                    html.Option("General interest", value='general'),
+                                    html.Option("Research collaboration", value='research'),
+                                    html.Option("Affected by the phenomenon", value='affected'),
+                                    html.Option("Media inquiry", value='media'),
+                                    html.Option("Other", value='other'),
+                                ], name='reason', id='contact-reason',
+                                   style={'width': '100%', 'padding': '8px 12px', 'fontSize': '13px',
+                                          'border': f'1px solid {COLORS["border"]}', 'borderRadius': '2px',
+                                          'backgroundColor': COLORS['light'], 'fontFamily': FONT_STACK_BODY})
                             ], style={'marginBottom': '12px'}),
                             html.Div([
-                                html.Label("Tell me more", style={'display': 'block', 'fontWeight': '700', 'fontSize': '11px',
-                                                                   'marginBottom': '6px', 'textTransform': 'uppercase',
-                                                                   'letterSpacing': '1px'}),
-                                dcc.Textarea(
-                                    name='message',
-                                    placeholder='Your message (required)',
-                                    style={'width': '100%', 'padding': '10px 12px', 'fontSize': '13px',
-                                           'border': f'1px solid {COLORS["border"]}', 'borderRadius': '2px',
-                                           'marginBottom': '12px', 'backgroundColor': COLORS['light'],
-                                           'minHeight': '120px', 'fontFamily': FONT_STACK_BODY,
-                                           'boxSizing': 'border-box'},
-                                    required=True
-                                )
+                                html.Label("Tell me more", htmlFor='contact-message',
+                                          style={'display': 'block', 'fontWeight': '700', 'fontSize': '11px',
+                                                 'marginBottom': '6px', 'textTransform': 'uppercase',
+                                                 'letterSpacing': '1px'}),
+                                html.Textarea(name='message', id='contact-message',
+                                             placeholder='Your message (required)', required=True,
+                                             style={'width': '100%', 'padding': '10px 12px', 'fontSize': '13px',
+                                                    'border': f'1px solid {COLORS["border"]}', 'borderRadius': '2px',
+                                                    'marginBottom': '12px', 'backgroundColor': COLORS['light'],
+                                                    'minHeight': '120px', 'fontFamily': FONT_STACK_BODY,
+                                                    'boxSizing': 'border-box', 'resize': 'vertical'})
                             ]),
                             html.Div([
-                                html.Label("Anything else?", style={'display': 'block', 'fontWeight': '700', 'fontSize': '11px',
-                                                                     'marginBottom': '6px', 'textTransform': 'uppercase',
-                                                                     'letterSpacing': '1px'}),
-                                dcc.Textarea(
-                                    name='additional',
-                                    placeholder='Additional information (optional)',
-                                    style={'width': '100%', 'padding': '10px 12px', 'fontSize': '13px',
-                                           'border': f'1px solid {COLORS["border"]}', 'borderRadius': '2px',
-                                           'marginBottom': '12px', 'backgroundColor': COLORS['light'],
-                                           'minHeight': '80px', 'fontFamily': FONT_STACK_BODY,
-                                           'boxSizing': 'border-box'}
-                                )
+                                html.Label("Anything else?", htmlFor='contact-additional',
+                                          style={'display': 'block', 'fontWeight': '700', 'fontSize': '11px',
+                                                 'marginBottom': '6px', 'textTransform': 'uppercase',
+                                                 'letterSpacing': '1px'}),
+                                html.Textarea(name='additional', id='contact-additional',
+                                             placeholder='Additional information (optional)',
+                                             style={'width': '100%', 'padding': '10px 12px', 'fontSize': '13px',
+                                                    'border': f'1px solid {COLORS["border"]}', 'borderRadius': '2px',
+                                                    'marginBottom': '12px', 'backgroundColor': COLORS['light'],
+                                                    'minHeight': '80px', 'fontFamily': FONT_STACK_BODY,
+                                                    'boxSizing': 'border-box', 'resize': 'vertical'})
                             ]),
                             html.Div([
                                 html.P("To activate this form, sign up at formspree.io, create a form, and replace YOUR_FORMSPREE_ID in dashboard.py with your form ID.",
