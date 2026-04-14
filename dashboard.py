@@ -760,8 +760,6 @@ app.layout = html.Div([
 
     ], id='loading-overlay', className='loading-overlay'),
 
-    # Store to track chart loading state — set True immediately so loading screen dismisses
-    dcc.Store(id='charts-loaded', data=True),
 
     # Header
     html.Div([
@@ -1400,34 +1398,9 @@ app.layout = html.Div([
 # CALLBACKS
 # ============================================================
 
-app.clientside_callback(
-    """
-    function(chartsLoaded) {
-        if (!window.__parasiteLoadStart) {
-            window.__parasiteLoadStart = Date.now();
-        }
-        if (chartsLoaded) {
-            function dismiss() {
-                var overlay = document.getElementById('loading-overlay');
-                if (overlay && !overlay.classList.contains('fade-out')) {
-                    overlay.classList.add('fade-out');
-                    setTimeout(function() { overlay.classList.add('hidden'); }, 800);
-                }
-            }
-            /* Let the CRT boot animation play for ~2.5s, then dismiss */
-            var minDisplayMs = 2500;
-            var elapsed = Date.now() - window.__parasiteLoadStart;
-            var remaining = Math.max(0, minDisplayMs - elapsed);
-            setTimeout(function() {
-                requestAnimationFrame(function() { requestAnimationFrame(dismiss); });
-            }, remaining);
-        }
-        return window.dash_clientside.no_update;
-    }
-    """,
-    Output('loading-overlay', 'className'),
-    Input('charts-loaded', 'data')
-)
+## Loading screen dismissal is handled by pure CSS animation on .loading-overlay
+# (animation: overlay-dismiss 0.8s ease-out 5.5s forwards in loading.css)
+# No clientside callback needed — CSS guarantees it never gets stuck.
 
 @app.callback(
     Output('post-count', 'children'),
@@ -1657,8 +1630,7 @@ def update_charts(start_date, end_date, subreddits, categories, authors, models)
      Output('author-chart', 'figure'),
      Output('model-chart', 'figure'),
      Output('category-evolution-chart', 'figure'),
-     Output('content-length-chart', 'figure'),
-     Output('charts-loaded', 'data')],
+     Output('content-length-chart', 'figure')],
     [Input('date-filter', 'start_date'),
      Input('date-filter', 'end_date'),
      Input('subreddit-filter', 'value'),
@@ -1667,8 +1639,7 @@ def update_charts(start_date, end_date, subreddits, categories, authors, models)
      Input('model-filter', 'value')]
 )
 def update_all_charts(start_date, end_date, subreddits, categories, authors, models):
-    charts = update_charts(start_date, end_date, subreddits or [], categories or [], authors or [], models or [])
-    return charts + (True,)
+    return update_charts(start_date, end_date, subreddits or [], categories or [], authors or [], models or [])
 
 
 @app.callback(

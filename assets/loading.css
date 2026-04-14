@@ -5,7 +5,9 @@
 
 @import url('https://fonts.googleapis.com/css2?family=VT323&family=Space+Mono:wght@400;700&family=DM+Serif+Display&display=swap');
 
-/* Full-page overlay — warm parchment ground */
+/* Full-page overlay — warm parchment ground
+   Auto-dismisses via CSS animation: visible for 5.5s, fades out over 0.8s, then hidden.
+   No JavaScript needed — pure CSS guarantees it never gets stuck. */
 .loading-overlay {
     position: fixed;
     top: 0;
@@ -20,10 +22,16 @@
     align-items: center;
     font-family: 'Space Mono', 'VT323', 'Courier New', monospace;
     color: #F5F0E8;
-    transition: opacity 0.2s ease-out;
     overflow: hidden;
+    animation: overlay-dismiss 0.8s ease-out 5.5s forwards;
 }
 
+@keyframes overlay-dismiss {
+    from { opacity: 1; pointer-events: auto; }
+    to   { opacity: 0; pointer-events: none; visibility: hidden; }
+}
+
+/* Keep these classes for backward compat but they're no longer needed */
 .loading-overlay.fade-out {
     opacity: 0;
     pointer-events: none;
@@ -172,7 +180,8 @@
 
 .status-loading {
     color: #c2410c;
-    animation: blink-text 0.8s infinite;
+    /* type-in first (from .line), then blink for a bit, then settle to solid */
+    animation: type-in 0.15s forwards, blink-text 0.8s 4.2s 3;
 }
 
 @keyframes blink-text {
