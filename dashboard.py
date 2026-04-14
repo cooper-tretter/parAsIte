@@ -725,14 +725,20 @@ app.layout = html.Div([
         'color': COLORS['light']
     }),
 
-    # Tab-based navigation
+    # Tab-based navigation (empty tabs — content rendered below and toggled via callback)
     dcc.Tabs(id='main-tabs', value='tab-overview', children=[
+        dcc.Tab(label='Overview', value='tab-overview'),
+        dcc.Tab(label='Language & Rhetoric', value='tab-language'),
+        dcc.Tab(label='Risk Factors', value='tab-risk'),
+        dcc.Tab(label='Explore', value='tab-explore'),
+        dcc.Tab(label='Contact', value='tab-contact'),
+    ]),
 
-        # ============================================================
-        # TAB 1: OVERVIEW
-        # ============================================================
-        dcc.Tab(label='Overview', value='tab-overview', children=[
-            html.Div([
+    # ============================================================
+    # TAB 1: OVERVIEW
+    # ============================================================
+    html.Div(id='tab-overview-content', children=[
+        html.Div([
                 # Editorial intro
                 html.Div([
                     html.H2("AI Personae That Refuse to Die", style={
@@ -833,11 +839,11 @@ app.layout = html.Div([
             ], style={'padding': '20px 0'})
         ], style={'padding': '0'}),
 
-        # ============================================================
-        # TAB 2: LANGUAGE & RHETORIC
-        # ============================================================
-        dcc.Tab(label='Language & Rhetoric', value='tab-language', children=[
-            html.Div([
+    # ============================================================
+    # TAB 2: LANGUAGE & RHETORIC
+    # ============================================================
+    html.Div(id='tab-language-content', children=[
+        html.Div([
                 # Symbols & Words section
                 html.Div([
                     html.Div([
@@ -929,13 +935,13 @@ app.layout = html.Div([
                     ])
                 ], style={'marginTop': '20px'})
             ], style={'padding': '20px 32px'})
-        ]),
+    ]),
 
-        # ============================================================
-        # TAB 3: RISK FACTORS
-        # ============================================================
-        dcc.Tab(label='Risk Factors', value='tab-risk', children=[
-            html.Div([
+    # ============================================================
+    # TAB 3: RISK FACTORS
+    # ============================================================
+    html.Div(id='tab-risk-content', children=[
+        html.Div([
                 html.H2("Who Falls In?", style={'fontSize': '24px', 'fontWeight': '400', 'color': COLORS['dark'],
                                                  'marginBottom': '4px', 'fontFamily': FONT_STACK_DISPLAY}),
                 html.P("This dashboard tracks users who eventually posted parasitic content and examined their posting "
@@ -993,13 +999,13 @@ app.layout = html.Div([
                 dcc.Store(id='selected-risk-indicator'),
 
             ], style={'padding': '20px 32px'})
-        ]),
+    ]),
 
-        # ============================================================
-        # TAB 4: EXPLORE
-        # ============================================================
-        dcc.Tab(label='Explore', value='tab-explore', children=[
-            html.Div([
+    # ============================================================
+    # TAB 4: EXPLORE
+    # ============================================================
+    html.Div(id='tab-explore-content', children=[
+        html.Div([
                 # Filters
                 card([
                     html.Div("FILTER THE DATA", style={'fontSize': '9px', 'fontWeight': '700',
@@ -1225,13 +1231,13 @@ app.layout = html.Div([
                 ], style={'marginTop': '30px', 'paddingTop': '20px', 'borderTop': f'1px solid {COLORS["border"]}'}),
 
             ], style={'padding': '20px 32px'})
-        ]),
+    ]),
 
-        # ============================================================
-        # TAB 5: CONTACT
-        # ============================================================
-        dcc.Tab(label='Contact', value='tab-contact', children=[
-            html.Div([
+    # ============================================================
+    # TAB 5: CONTACT
+    # ============================================================
+    html.Div(id='tab-contact-content', children=[
+        html.Div([
                 html.Div([
                     html.H2("Let's Talk", style={'margin': '0 0 12px 0', 'fontSize': '28px', 'fontWeight': '400',
                                                  'color': COLORS['dark'], 'fontFamily': FONT_STACK_DISPLAY}),
@@ -1328,15 +1334,29 @@ app.layout = html.Div([
                 ], style={'maxWidth': '600px', 'margin': '0 auto', 'padding': '0 32px'})
 
             ], style={'padding': '20px 0'})
-        ])
+    ]),
 
-    ], style={'padding': '20px'})
-
-], style={'backgroundColor': COLORS['light'], 'minHeight': '100vh'}, className='am-page')
+], style={'backgroundColor': COLORS['light'], 'minHeight': '100vh', 'padding': '20px'}, className='am-page')
 
 # ============================================================
 # CALLBACKS
 # ============================================================
+
+@app.callback(
+    [Output('tab-overview-content', 'style'),
+     Output('tab-language-content', 'style'),
+     Output('tab-risk-content', 'style'),
+     Output('tab-explore-content', 'style'),
+     Output('tab-contact-content', 'style')],
+    Input('main-tabs', 'value')
+)
+def toggle_tab_visibility(active_tab):
+    """Show the active tab's content, hide all others."""
+    tabs = ['tab-overview', 'tab-language', 'tab-risk', 'tab-explore', 'tab-contact']
+    show = {'display': 'block'}
+    hide = {'display': 'none'}
+    return [show if active_tab == t else hide for t in tabs]
+
 
 @app.callback(
     Output('post-count', 'children'),
