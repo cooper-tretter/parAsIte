@@ -1371,8 +1371,11 @@ def filter_dataframe(df, start_date, end_date, subreddits, categories, authors, 
     filtered = df.copy()
 
     if start_date and end_date:
-        filtered = filtered[(filtered['created_utc'].dt.date >= start_date) &
-                           (filtered['created_utc'].dt.date <= end_date)]
+        # DatePickerRange returns date strings — convert to date objects for comparison
+        start = pd.to_datetime(start_date).date()
+        end = pd.to_datetime(end_date).date()
+        filtered = filtered[(filtered['created_utc'].dt.date >= start) &
+                           (filtered['created_utc'].dt.date <= end)]
 
     if subreddits:
         filtered = filtered[filtered['subreddit'].isin(subreddits)]
