@@ -760,8 +760,8 @@ app.layout = html.Div([
 
     ], id='loading-overlay', className='loading-overlay'),
 
-    # Store to track chart loading state
-    dcc.Store(id='charts-loaded', data=False),
+    # Store to track chart loading state — set True immediately so loading screen dismisses
+    dcc.Store(id='charts-loaded', data=True),
 
     # Header
     html.Div([
@@ -1414,18 +1414,12 @@ app.clientside_callback(
                     setTimeout(function() { overlay.classList.add('hidden'); }, 800);
                 }
             }
-            var minDisplayMs = 5000;
+            /* Let the CRT boot animation play for ~2.5s, then dismiss */
+            var minDisplayMs = 2500;
             var elapsed = Date.now() - window.__parasiteLoadStart;
             var remaining = Math.max(0, minDisplayMs - elapsed);
             setTimeout(function() {
-                var attempts = 0;
-                var poll = setInterval(function() {
-                    attempts++;
-                    if (document.querySelectorAll('.js-plotly-plot .plot-container').length >= 1 || attempts >= 50) {
-                        clearInterval(poll);
-                        requestAnimationFrame(function() { requestAnimationFrame(dismiss); });
-                    }
-                }, 200);
+                requestAnimationFrame(function() { requestAnimationFrame(dismiss); });
             }, remaining);
         }
         return window.dash_clientside.no_update;
