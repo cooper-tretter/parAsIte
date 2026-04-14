@@ -701,66 +701,6 @@ except Exception as e:
 
 # Layout with tabs
 app.layout = html.Div([
-    # ============================================================
-    # RETRO CRT LOADING SCREEN
-    # ============================================================
-    html.Div([
-        # CRT vignette overlay
-        html.Div(className='crt-vignette'),
-
-        # ASCII art parasite organism — box borders + block fill, every line exactly 34 chars
-        html.Pre(
-            "\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n"
-            "\u2551\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2551\n"
-            "\u2551\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2551\n"
-            "\u2551\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2593\u2593\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2593\u2593\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2551\n"
-            "\u2551\u2591\u2591\u2591\u2591\u2591\u2593\u2588\u2588\u2588\u2588\u2593\u2593\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2593\u2593\u2588\u2588\u2588\u2588\u2593\u2591\u2591\u2591\u2591\u2591\u2551\n"
-            "\u2551\u2591\u2591\u2591\u2591\u2593\u2588\u2588\u2593\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2593\u2588\u2588\u2593\u2591\u2591\u2591\u2591\u2591\u2591\u2551\n"
-            "\u2551\u2591\u2591\u2591\u2591\u2593\u2588\u2588\u2593\u2591\u2591\u2591\u2591\u2588\u2588\u2591\u2591\u2591\u2591\u2588\u2588\u2591\u2591\u2591\u2591\u2593\u2588\u2588\u2593\u2591\u2591\u2591\u2591\u2551\n"
-            "\u2551\u2591\u2591\u2591\u2591\u2593\u2588\u2588\u2593\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2593\u2588\u2588\u2593\u2591\u2591\u2591\u2591\u2591\u2591\u2551\n"
-            "\u2551\u2591\u2591\u2591\u2591\u2591\u2593\u2588\u2588\u2593\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2593\u2588\u2588\u2593\u2591\u2591\u2591\u2591\u2591\u2551\n"
-            "\u2551\u2591\u2591\u2591\u2591\u2591\u2593\u2588\u2588\u2588\u2588\u2593\u2593\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2593\u2593\u2588\u2588\u2588\u2588\u2593\u2591\u2591\u2591\u2591\u2591\u2551\n"
-            "\u2551\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2593\u2593\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2593\u2593\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2551\n"
-            "\u2551\u2591\u2591\u2591\u2591\u2593\u2593\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2593\u2593\u2591\u2591\u2591\u2591\u2551\n"
-            "\u2551\u2591\u2591\u2591\u2593\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2593\u2591\u2591\u2591\u2551\n"
-            "\u2551\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2551\n"
-            "\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d",
-            className='ascii-art'
-        ),
-
-        # Title
-        html.Div("PARASITE  DETECTION  ARRAY", className='boot-title'),
-
-        # Boot sequence lines
-        html.Div([
-            html.Div("BIOS v2.0 .............. ParAsIte Systems", className='line',
-                     style={'animationDelay': '0.4s'}),
-            html.Div("MEM CHECK: 3176 PARASITIC POSTS ....... OK", className='line',
-                     style={'animationDelay': '0.9s'}),
-            html.Div("AFFECT PATTERN DB [48 VECTORS] ........ OK", className='line',
-                     style={'animationDelay': '1.5s'}),
-            html.Div("SCANNING REDDIT HIVE MIND ............. OK", className='line',
-                     style={'animationDelay': '2.1s'}),
-            html.Div("RISK FACTOR CORRELATION ENGINE ........ OK", className='line',
-                     style={'animationDelay': '2.8s'}),
-            html.Div("RHETORICAL STRATEGY PROFILES .......... OK", className='line',
-                     style={'animationDelay': '3.5s'}),
-            html.Div("RENDERING VISUALIZATION GRID ..........", className='line status-loading',
-                     style={'animationDelay': '4.2s'}),
-        ], className='boot-text'),
-
-        # Progress bar — single div that fills via stepped keyframes synced to boot lines
-        html.Div([
-            html.Div("LOADING:", className='progress-label'),
-            html.Div(className='progress-track'),
-        ], className='progress-container'),
-
-        # Version tag
-        html.Div("SYS BUILD 048 // PARASITE DETECTION ARRAY // 2026", className='boot-version'),
-
-    ], id='loading-overlay', className='loading-overlay'),
-
-
     # Header
     html.Div([
         html.Div([
@@ -1397,10 +1337,6 @@ app.layout = html.Div([
 # ============================================================
 # CALLBACKS
 # ============================================================
-
-## Loading screen dismissal is handled by pure CSS animation on .loading-overlay
-# (animation: overlay-dismiss 0.8s ease-out 5.5s forwards in loading.css)
-# No clientside callback needed — CSS guarantees it never gets stuck.
 
 @app.callback(
     Output('post-count', 'children'),
