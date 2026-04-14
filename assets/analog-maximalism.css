@@ -197,7 +197,14 @@ textarea:focus {
     background-color: transparent !important;
 }
 
+.rc-tabs-nav-list {
+    display: flex !important;
+    width: 100% !important;
+}
+
 .rc-tabs-tab {
+    flex: 1 !important;
+    text-align: center !important;
     padding: 12px 20px !important;
     font-family: 'Space Mono', monospace !important;
     font-size: 12px !important;

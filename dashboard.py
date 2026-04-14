@@ -1404,7 +1404,7 @@ def update_charts(start_date, end_date, subreddits, categories, authors, models)
         line=dict(color=COLORS['primary'], width=2),
         marker=dict(size=6, color=COLORS['primary'])
     ))
-    time_fig.update_layout(
+    time_fig.update_layout(dragmode=False,
         title="Weekly Post Activity",
         xaxis=dict(title="Date", fixedrange=True),
         yaxis=dict(title="Posts", fixedrange=True),
@@ -1428,7 +1428,7 @@ def update_charts(start_date, end_date, subreddits, categories, authors, models)
         text=[s[1] for s in symbol_counts],
         textposition='outside'
     ))
-    sym_fig.update_layout(
+    sym_fig.update_layout(dragmode=False,
         title="Top Unicode Symbols",
         xaxis=dict(title="Frequency", fixedrange=True),
         yaxis=dict(fixedrange=True),
@@ -1444,7 +1444,7 @@ def update_charts(start_date, end_date, subreddits, categories, authors, models)
     word_fig = go.Figure()
     word_fig.add_annotation(text="Select filters to generate word frequency chart",
                            xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
-    word_fig.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+    word_fig.update_layout(dragmode=False,height=300, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
 
     # Subreddit chart
     sub_counts = df_filtered['subreddit'].value_counts().head(10)
@@ -1457,7 +1457,7 @@ def update_charts(start_date, end_date, subreddits, categories, authors, models)
         text=sub_counts.values,
         textposition='outside'
     ))
-    sub_fig.update_layout(
+    sub_fig.update_layout(dragmode=False,
         title="Top Subreddits",
         xaxis=dict(title="Posts", fixedrange=True),
         yaxis=dict(fixedrange=True),
@@ -1477,7 +1477,7 @@ def update_charts(start_date, end_date, subreddits, categories, authors, models)
         values=cat_counts.values,
         marker=dict(colors=[COLORS['primary'], COLORS['secondary'], COLORS['success'], COLORS['warning']])
     ))
-    cat_fig.update_layout(
+    cat_fig.update_layout(dragmode=False,
         title="Content Categories",
         height=300,
         margin=dict(l=20, r=20, t=40, b=20),
@@ -1497,7 +1497,7 @@ def update_charts(start_date, end_date, subreddits, categories, authors, models)
         text=auth_counts.values,
         textposition='outside'
     ))
-    auth_fig.update_layout(
+    auth_fig.update_layout(dragmode=False,
         title="Top Authors",
         xaxis=dict(title="Posts", fixedrange=True),
         yaxis=dict(fixedrange=True),
@@ -1517,7 +1517,7 @@ def update_charts(start_date, end_date, subreddits, categories, authors, models)
         values=model_counts.values,
         marker=dict(colors=[COLORS['accent'], COLORS['primary'], COLORS['secondary']])
     ))
-    model_fig.update_layout(
+    model_fig.update_layout(dragmode=False,
         title="AI Models Mentioned",
         height=300,
         margin=dict(l=20, r=20, t=40, b=20),
@@ -1542,7 +1542,7 @@ def update_charts(start_date, end_date, subreddits, categories, authors, models)
             stackgroup='one'
         ))
 
-    cat_evolution_fig.update_layout(
+    cat_evolution_fig.update_layout(dragmode=False,
         title="Category Distribution Over Time",
         xaxis=dict(title="Week", fixedrange=True),
         yaxis=dict(title="Posts", fixedrange=True),
@@ -1564,7 +1564,7 @@ def update_charts(start_date, end_date, subreddits, categories, authors, models)
         labels={'content_length': 'Characters'},
         color_discrete_sequence=[COLORS['primary']]
     )
-    content_hist_fig.update_layout(
+    content_hist_fig.update_layout(dragmode=False,
         height=350,
         margin=dict(l=40, r=20, t=40, b=40),
         paper_bgcolor='rgba(0,0,0,0)',
@@ -1635,7 +1635,7 @@ def update_word_chart(hide_stopwords, custom_stopwords, start_date, end_date, su
         text=[w[1] for w in word_counts],
         textposition='outside'
     ))
-    fig.update_layout(
+    fig.update_layout(dragmode=False,
         title="Top Words",
         xaxis=dict(title="Frequency", fixedrange=True),
         yaxis=dict(fixedrange=True),
@@ -1701,7 +1701,7 @@ def update_affect_radar(time_range, start_date, end_date, subreddits, categories
         line=dict(color=COLORS['primary']),
         fillcolor='rgba(194, 65, 12, 0.25)'
     ))
-    fig.update_layout(
+    fig.update_layout(dragmode=False,
         polar=dict(
             radialaxis=dict(
                 visible=True,
@@ -1749,7 +1749,7 @@ def update_correlation_display(active_tab):
         empty_fig = go.Figure()
         empty_fig.add_annotation(text="Insufficient data for correlation analysis",
                                 xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
-        empty_fig.update_layout(height=350, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+        empty_fig.update_layout(dragmode=False,height=350, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
         return empty_fig, html.P("No user history data available. Run user_history.py to collect data.",
                                 style={'color': COLORS['muted']})
 
@@ -1801,7 +1801,7 @@ def update_correlation_display(active_tab):
     max_rate = max(list(rates_with) + list(rates_without)) if rates_with or rates_without else 100
     y_max = max_rate * 1.25
 
-    fig.update_layout(
+    fig.update_layout(dragmode=False,
         title='Post-Parasitic Rate by Pre-Parasitic Risk Factor (click bars for details)',
         barmode='group',
         height=450,
