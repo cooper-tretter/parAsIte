@@ -1368,10 +1368,23 @@ def update_post_count(_):
 
 def filter_dataframe(df, start_date, end_date, subreddits, categories, authors, models):
     """Filter dataframe by multiple criteria."""
+    # Skip copy if no filters are actually narrowing the data
+    needs_filter = bool(subreddits or categories or authors or models)
+
+    if start_date and end_date:
+        start = pd.to_datetime(start_date).date()
+        end = pd.to_datetime(end_date).date()
+        df_min = df['created_utc'].min().date() if len(df) > 0 else start
+        df_max = df['created_utc'].max().date() if len(df) > 0 else end
+        if start > df_min or end < df_max:
+            needs_filter = True
+
+    if not needs_filter:
+        return df
+
     filtered = df.copy()
 
     if start_date and end_date:
-        # DatePickerRange returns date strings — convert to date objects for comparison
         start = pd.to_datetime(start_date).date()
         end = pd.to_datetime(end_date).date()
         filtered = filtered[(filtered['created_utc'].dt.date >= start) &
@@ -1392,8 +1405,14 @@ def filter_dataframe(df, start_date, end_date, subreddits, categories, authors, 
     return filtered
 
 
+_chart_cache = {}
+
 def update_charts(start_date, end_date, subreddits, categories, authors, models):
-    """Generate all charts based on filters."""
+    """Generate all charts based on filters. Caches default (unfiltered) result."""
+    cache_key = (str(start_date), str(end_date), tuple(subreddits), tuple(categories), tuple(authors), tuple(models))
+    if cache_key in _chart_cache:
+        return _chart_cache[cache_key]
+
     df_filtered = filter_dataframe(df_all, start_date, end_date, subreddits, categories, authors, models)
 
     # Time series chart
@@ -1419,22 +1438,23 @@ def update_charts(start_date, end_date, subreddits, categories, authors, models)
         font=dict(family=FONT_STACK_BODY, color=COLORS['dark'])
     )
 
-    # Symbol chart
+    # Symbol chart (reversed so most common is at top for horizontal bars)
     symbols = extract_symbols(df_filtered['content'].fillna(''))
     symbol_counts = Counter(symbols).most_common(20)
+    symbol_counts_rev = list(reversed(symbol_counts))
     sym_fig = go.Figure()
     sym_fig.add_trace(go.Bar(
-        y=[s[0] for s in symbol_counts],
-        x=[s[1] for s in symbol_counts],
+        y=[s[0] for s in symbol_counts_rev],
+        x=[s[1] for s in symbol_counts_rev],
         orientation='h',
         marker_color=COLORS['secondary'],
-        text=[s[1] for s in symbol_counts],
+        text=[s[1] for s in symbol_counts_rev],
         textposition='outside'
     ))
     sym_fig.update_layout(dragmode=False,
         title="Top Unicode Symbols",
         xaxis=dict(title="Frequency", fixedrange=True),
-        yaxis=dict(fixedrange=True),
+        yaxis=dict(fixedrange=True, tickfont=dict(family='Noto Sans, Segoe UI Emoji, Apple Color Emoji, sans-serif', size=14)),
         height=300,
         margin=dict(l=80, r=20, t=40, b=40),
         paper_bgcolor='rgba(0,0,0,0)',
@@ -1449,8 +1469,8 @@ def update_charts(start_date, end_date, subreddits, categories, authors, models)
                            xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
     word_fig.update_layout(dragmode=False,height=300, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
 
-    # Subreddit chart
-    sub_counts = df_filtered['subreddit'].value_counts().head(10)
+    # Subreddit chart (reversed so most common at top)
+    sub_counts = df_filtered['subreddit'].value_counts().head(10).iloc[::-1]
     sub_fig = go.Figure()
     sub_fig.add_trace(go.Bar(
         y=sub_counts.index,
@@ -1489,8 +1509,8 @@ def update_charts(start_date, end_date, subreddits, categories, authors, models)
         font=dict(family=FONT_STACK_BODY, color=COLORS['dark'])
     )
 
-    # Author chart
-    auth_counts = df_filtered['author'].value_counts().head(10)
+    # Author chart (reversed so most common at top)
+    auth_counts = df_filtered['author'].value_counts().head(10).iloc[::-1]
     auth_fig = go.Figure()
     auth_fig.add_trace(go.Bar(
         y=auth_counts.index,
@@ -1578,7 +1598,11 @@ def update_charts(start_date, end_date, subreddits, categories, authors, models)
         font=dict(family=FONT_STACK_BODY, color=COLORS['dark'])
     )
 
-    return time_fig, sym_fig, sub_fig, cat_fig, auth_fig, model_fig, cat_evolution_fig, content_hist_fig
+    result = (time_fig, sym_fig, sub_fig, cat_fig, auth_fig, model_fig, cat_evolution_fig, content_hist_fig)
+    # Cache the default (unfiltered) result for instant reload
+    if not subreddits and not categories and not authors and not models:
+        _chart_cache[cache_key] = result
+    return result
 
 
 @app.callback(
@@ -1627,7 +1651,7 @@ def update_word_chart(hide_stopwords, custom_stopwords, start_date, end_date, su
         custom = set(w.strip().lower() for w in custom_stopwords.split(',') if w.strip())
         words = [w for w in words if w not in custom]
 
-    word_counts = Counter(words).most_common(30)
+    word_counts = list(reversed(Counter(words).most_common(30)))
 
     fig = go.Figure()
     fig.add_trace(go.Bar(
@@ -1689,11 +1713,18 @@ def update_affect_radar(time_range, start_date, end_date, subreddits, categories
         max_idx = int(len(df_filtered) * time_range[1] / 100)
         df_filtered = df_filtered.iloc[min_idx:max_idx]
 
-    # Calculate average affect scores
+    # Calculate average affect scores (replace NaN with 0)
     affect_scores = {}
     for dimension in AFFECT_PATTERNS.keys():
         col = AFFECT_COL_MAP[dimension]
-        affect_scores[dimension] = df_filtered[col].mean() if col in df_filtered.columns else 0
+        if col in df_filtered.columns:
+            val = df_filtered[col].mean()
+            affect_scores[dimension] = val if pd.notna(val) else 0
+        else:
+            affect_scores[dimension] = 0
+
+    max_score = max(affect_scores.values()) if affect_scores.values() else 0
+    max_score = max_score if max_score > 0 else 10
 
     fig = go.Figure()
     fig.add_trace(go.Scatterpolar(
@@ -1708,7 +1739,7 @@ def update_affect_radar(time_range, start_date, end_date, subreddits, categories
         polar=dict(
             radialaxis=dict(
                 visible=True,
-                range=[0, max(affect_scores.values()) * 1.2] if affect_scores.values() else [0, 10],
+                range=[0, max_score * 1.2],
                 fixedrange=True
             ),
             angularaxis=dict(fixedrange=True)
