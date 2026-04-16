@@ -1440,7 +1440,7 @@ def update_charts(start_date, end_date, subreddits, categories, authors, models)
 
     # Symbol chart (reversed so most common is at top for horizontal bars)
     symbols = extract_symbols(df_filtered['content'].fillna(''))
-    symbol_counts = Counter(symbols).most_common(20)
+    symbol_counts = Counter(symbols).most_common(10)
     symbol_counts_rev = list(reversed(symbol_counts))
     sym_fig = go.Figure()
     sym_fig.add_trace(go.Bar(
@@ -1454,8 +1454,8 @@ def update_charts(start_date, end_date, subreddits, categories, authors, models)
     sym_fig.update_layout(dragmode=False,
         title="Top Unicode Symbols",
         xaxis=dict(title="Frequency", fixedrange=True),
-        yaxis=dict(fixedrange=True, tickfont=dict(family='Noto Sans, Segoe UI Emoji, Apple Color Emoji, sans-serif', size=14)),
-        height=300,
+        yaxis=dict(fixedrange=True, tickfont=dict(family='Noto Sans, Segoe UI Emoji, Apple Color Emoji, sans-serif', size=16)),
+        height=400,
         margin=dict(l=80, r=20, t=40, b=40),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
@@ -1651,7 +1651,7 @@ def update_word_chart(hide_stopwords, custom_stopwords, start_date, end_date, su
         custom = set(w.strip().lower() for w in custom_stopwords.split(',') if w.strip())
         words = [w for w in words if w not in custom]
 
-    word_counts = list(reversed(Counter(words).most_common(30)))
+    word_counts = list(reversed(Counter(words).most_common(15)))
 
     fig = go.Figure()
     fig.add_trace(go.Bar(
@@ -1666,7 +1666,7 @@ def update_word_chart(hide_stopwords, custom_stopwords, start_date, end_date, su
         title="Top Words",
         xaxis=dict(title="Frequency", fixedrange=True),
         yaxis=dict(fixedrange=True),
-        height=350,
+        height=450,
         margin=dict(l=100, r=20, t=40, b=40),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
@@ -1708,7 +1708,7 @@ def update_affect_radar(time_range, start_date, end_date, subreddits, categories
         return empty_fig
 
     # Apply time range slider
-    if time_range and time_range[0] > 0 or time_range[1] < 100:
+    if time_range and (time_range[0] > 0 or time_range[1] < 100):
         min_idx = int(len(df_filtered) * time_range[0] / 100)
         max_idx = int(len(df_filtered) * time_range[1] / 100)
         df_filtered = df_filtered.iloc[min_idx:max_idx]
